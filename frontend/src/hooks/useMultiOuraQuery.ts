@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 
-import { api } from "@/lib/api";
+import { api, DATA_REFRESH_EVENT } from "@/lib/api";
 
 interface QueryResult {
     date: string;
@@ -11,6 +11,13 @@ export function useMultiOuraQuery(paths: string[], startDate?: string, endDate?:
     const [data, setData] = useState<any[]>([]);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const [refreshKey, setRefreshKey] = useState(0);
+
+    useEffect(() => {
+        const onRefresh = () => setRefreshKey(k => k + 1);
+        window.addEventListener(DATA_REFRESH_EVENT, onRefresh);
+        return () => window.removeEventListener(DATA_REFRESH_EVENT, onRefresh);
+    }, []);
 
     useEffect(() => {
         if (!paths || paths.length === 0) {
@@ -64,7 +71,7 @@ export function useMultiOuraQuery(paths: string[], startDate?: string, endDate?:
         };
 
         fetchData();
-    }, [JSON.stringify(paths), startDate, endDate]);
+    }, [JSON.stringify(paths), startDate, endDate, refreshKey]);
 
     return { data, loading, error };
 }

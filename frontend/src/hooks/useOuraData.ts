@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 
-import { api } from '@/lib/api';
+import { api, DATA_REFRESH_EVENT } from '@/lib/api';
 
 export interface DailyScore {
     score: number;
@@ -42,6 +42,16 @@ export interface ResilienceData {
 export const useOuraData = (date: string) => {
     const [data, setData] = useState<any>(null);
     const [history, setHistory] = useState<{ sleep: any[], activity: any[], readiness: any[] }>({ sleep: [], activity: [], readiness: [] });
+    // Bumped by the DATA_REFRESH_EVENT listener (see below) so we re-run the
+    // fetch effect whenever a sync/upload completes — without this the
+    // dashboard stays empty after ingestion until the user reloads the tab.
+    const [refreshKey, setRefreshKey] = useState(0);
+
+    useEffect(() => {
+        const onRefresh = () => setRefreshKey(k => k + 1);
+        window.addEventListener(DATA_REFRESH_EVENT, onRefresh);
+        return () => window.removeEventListener(DATA_REFRESH_EVENT, onRefresh);
+    }, []);
 
     useEffect(() => {
         if (!date) return;
@@ -76,7 +86,7 @@ export const useOuraData = (date: string) => {
             });
         }).catch(err => console.error("Error fetching history:", err));
 
-    }, [date]);
+    }, [date, refreshKey]);
 
 
 

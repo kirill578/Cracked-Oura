@@ -8,13 +8,21 @@ logger = logging.getLogger("Paths")
 def get_user_data_dir() -> Path:
     """
     Returns the platform-specific user data directory for the application.
+    - HA add-on: /data (the only path Supervisor maps as persistent; everything
+      else inside the container is wiped on restart/update, which would log the
+      user out and erase the SQLite DB on every upgrade).
     - Windows: %APPDATA%/CrackedOura
     - macOS: ~/Library/Application Support/CrackedOura
     - Linux: ~/.local/share/CrackedOura
     """
     app_name = "CrackedOura"
-    
-    if sys.platform == "win32":
+
+    if os.environ.get("HA_ADDON") == "1":
+        # Supervisor mounts /data per-add-on; it persists across restarts and
+        # add-on updates. Without this we'd lose the Playwright storage_state
+        # (login session), oura_database.db, and oura_config.json on every boot.
+        path = Path("/data")
+    elif sys.platform == "win32":
         path = Path(os.getenv("APPDATA")) / app_name
     elif sys.platform == "darwin":
         path = Path.home() / "Library" / "Application Support" / app_name

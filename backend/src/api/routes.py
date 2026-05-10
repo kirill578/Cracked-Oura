@@ -201,6 +201,18 @@ async def check_status():
     """Returns the current automation status from the persistent config."""
     return config_manager.get_config()
 
+@router.get("/api/automation/auth-status")
+async def auth_status():
+    """Reports whether a persisted Oura login session exists on disk.
+
+    The frontend shows a fresh "Login" button on every reload because the
+    SettingsPanel's React state is local; it has no way to know that the
+    Playwright storage_state is sitting on disk and will be reused on the
+    next sync. This endpoint exposes that, so the UI can render
+    "Logged in / Clear session" instead of nudging the user to re-OTP.
+    """
+    return {"logged_in": os.path.exists(automator.storage_state_path)}
+
 @router.post("/api/automation/download")
 async def download_export(db: Session = Depends(get_db)):
     """

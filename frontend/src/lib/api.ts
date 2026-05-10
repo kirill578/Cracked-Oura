@@ -4,6 +4,17 @@
 // path would bypass the ingress proxy and hit HA's own API instead.
 const BASE_URL = new URL('.', document.baseURI).href.replace(/\/$/, '');
 
+/** Custom DOM event emitted whenever an action mutates server-side data (a
+ * sync, download, or manual upload). Hooks like `useOuraData` listen for
+ * this and re-fetch instead of relying on a manual page reload. */
+export const DATA_REFRESH_EVENT = 'oura:data-refresh';
+
+const broadcastDataRefresh = () => {
+    if (typeof window !== 'undefined') {
+        window.dispatchEvent(new Event(DATA_REFRESH_EVENT));
+    }
+};
+
 export interface AutomationStatusResponse {
     status: 'idle' | 'login_needed' | 'otp_needed' | 'logged_in' | 'exporting' | 'ready_to_download' | 'downloading' | 'completed' | 'error';
     message?: string;
@@ -124,10 +135,23 @@ export const api = {
         return res.json();
     },
 
+    /** True if the backend has a saved Playwright session on disk. Used by
+     * the settings panel to render "Logged in" instead of the email/login
+     * form after a page reload. */
+    getAuthStatus: async (): Promise<{ logged_in: boolean }> => {
+        const res = await fetch(`${BASE_URL}/api/automation/auth-status`);
+        if (!res.ok) throw new Error('Failed to check auth status');
+        return res.json();
+    },
+
     downloadExport: async () => {
         const res = await fetch(`${BASE_URL}/api/automation/download`, { method: 'POST' });
         const data = await res.json();
         if (!res.ok) throw new Error(data.detail || 'Download failed');
+        // Download + ingest finished synchronously on the server. Tell every
+        // hook on the page to re-fetch so widgets pick up the new rows
+        // without a manual page reload.
+        broadcastDataRefresh();
         return data;
     },
 
@@ -140,6 +164,7 @@ export const api = {
         });
         const data = await res.json();
         if (!res.ok) throw new Error(data.detail || 'Upload failed');
+        broadcastDataRefresh();
         return data;
     },
 

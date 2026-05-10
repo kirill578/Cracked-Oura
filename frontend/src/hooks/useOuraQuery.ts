@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 
-import { api } from '@/lib/api';
+import { api, DATA_REFRESH_EVENT } from '@/lib/api';
 
 interface QueryResult {
     date: string;
@@ -11,6 +11,13 @@ export function useOuraQuery(path: string, startDate?: string, endDate?: string)
     const [data, setData] = useState<QueryResult[]>([]);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const [refreshKey, setRefreshKey] = useState(0);
+
+    useEffect(() => {
+        const onRefresh = () => setRefreshKey(k => k + 1);
+        window.addEventListener(DATA_REFRESH_EVENT, onRefresh);
+        return () => window.removeEventListener(DATA_REFRESH_EVENT, onRefresh);
+    }, []);
 
     useEffect(() => {
         if (!path) return;
@@ -30,7 +37,7 @@ export function useOuraQuery(path: string, startDate?: string, endDate?: string)
         };
 
         fetchData();
-    }, [path, startDate, endDate]);
+    }, [path, startDate, endDate, refreshKey]);
 
     return { data, loading, error };
 }

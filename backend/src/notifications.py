@@ -72,6 +72,18 @@ def build_summary(db: Session) -> Optional[str]:
     """Queries the most recent day in the DB and returns the Telegram message text.
 
     Returns None when there's no data yet (fresh install before first sync).
+
+    Day semantics:
+      * ``latest_day`` is the most recent ``Sleep.day``, i.e. the morning the
+        user just woke up. Sleep score, readiness score, and the sleep
+        session (deep/REM/light) all describe *that* night's sleep.
+      * Activity/steps for ``latest_day``, however, only cover the few
+        morning hours since waking — they're partial and misleading. The
+        user wants to see *yesterday's full-day* steps under the
+        "Yesterday's steps" label, so we pull the most recent activity row
+        strictly before ``latest_day``. We do not use ``latest_day - 1``
+        directly because there can be ingestion gaps (missed days, ring on
+        charger, etc.).
     """
     latest_day: Optional[date] = db.query(func.max(Sleep.day)).scalar()
     if latest_day is None:
@@ -81,8 +93,17 @@ def build_summary(db: Session) -> Optional[str]:
     day_label = f"{latest_day.strftime('%a %b')} {latest_day.day}"  # e.g. "Mon Jan 19"
 
     sleep_row = db.query(Sleep).filter(Sleep.day == latest_day).first()
-    activity_row = db.query(Activity).filter(Activity.day == latest_day).first()
     readiness_row = db.query(Readiness).filter(Readiness.day == latest_day).first()
+
+    # Yesterday's full-day activity. Falling back to the latest *complete*
+    # day before the user's wake-up day avoids reporting "0 steps" or a tiny
+    # partial number when the morning's activity row exists but is empty.
+    activity_row = (
+        db.query(Activity)
+        .filter(Activity.day < latest_day)
+        .order_by(Activity.day.desc())
+        .first()
+    )
 
     # Prefer the longest 'sleep' type session; fall back to any session.
     session = (

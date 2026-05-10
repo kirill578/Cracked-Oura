@@ -98,6 +98,16 @@ export function SettingsPanel({ onClose }: SettingsPanelProps) {
                 setTelegramChatId(data.telegram_chat_id ?? '');
             })
             .catch(err => console.error("Failed to fetch settings", err));
+
+        // Reflect the persisted Playwright session on the server so the panel
+        // doesn't pretend the user is logged out after a page reload — without
+        // this you'd see the email/login form again even though the next sync
+        // would happily reuse the saved cookies.
+        api.getAuthStatus()
+            .then(({ logged_in }) => {
+                if (logged_in) setStatus('logged_in');
+            })
+            .catch(err => console.error("Failed to fetch auth status", err));
     }, []);
 
     useEffect(() => {
@@ -479,7 +489,7 @@ export function SettingsPanel({ onClose }: SettingsPanelProps) {
                             {/* Status Indicator */}
                             <div className="flex items-center gap-2 p-3 bg-secondary/50 rounded-lg">
                                 <div className={cn("h-2.5 w-2.5 rounded-full",
-                                    status === 'completed' ? "bg-green-500" :
+                                    status === 'completed' || status === 'logged_in' ? "bg-green-500" :
                                         status === 'error' ? "bg-red-500" :
                                             loading ? "bg-yellow-500 animate-pulse" : "bg-gray-500"
                                 )} />
