@@ -10,6 +10,13 @@ from .config import config_manager
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("OuraAutomator")
 
+# Realistic Chrome UA — default Playwright UA is often flagged by identity providers.
+_CHROME_USER_AGENT = (
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 "
+    "(KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"
+)
+
+
 class OuraAutomator:
     """
     Automates Oura Web Dashboard interactions using Playwright.
@@ -66,7 +73,12 @@ class OuraAutomator:
         logger.info(f"Initializing Playwright (Headless: {headless})")
         self.playwright = await async_playwright().start()
 
-        launch_args = ["--no-sandbox", "--disable-setuid-sandbox"]
+        launch_args = [
+            "--no-sandbox",
+            "--disable-setuid-sandbox",
+            # Reduces obvious AutomationControlled signals (Oura uses moi.ouraring.com IdP).
+            "--disable-blink-features=AutomationControlled",
+        ]
         if not self._ha_addon:
             launch_args.append("--start-maximized")
 
@@ -93,9 +105,17 @@ class OuraAutomator:
             
         self.context = await self.browser.new_context(
             viewport={"width": 1920, "height": 1080},
-            storage_state=state
+            storage_state=state,
+            user_agent=_CHROME_USER_AGENT,
+            locale="en-US",
+            extra_http_headers={
+                "Accept-Language": "en-US,en;q=0.9",
+            },
         )
-            
+        await self.context.add_init_script("""
+            Object.defineProperty(navigator, 'webdriver', { get: () => undefined });
+        """)
+
         self.page = await self.context.new_page()
         self._is_initialized = True
 
@@ -183,15 +203,17 @@ class OuraAutomator:
         if not self.page:
             raise Exception("Page not initialized")
 
-        logger.info("Checking login status...")
+        logger.info("Checking login status... (initial url=%r)", self.page.url)
         try:
             # Check if already on the correct domain or redirect to it
             if self.base_url in self.page.url:
                  pass
             else:
+                 logger.info("Navigating to base URL %s", self.base_url)
                  await self.page.goto(self.base_url, timeout=60000)
             
             await self.page.wait_for_load_state("networkidle", timeout=10000)
+            logger.info("After load: url=%r", self.page.url)
             
             if self._is_logged_in():
                 logger.info("Already logged in.")
@@ -205,7 +227,8 @@ class OuraAutomator:
             return await self._perform_login_actions()
 
         except Exception as e:
-            logger.error(f"Login error: {e}")
+            logger.error("Login error: %s", e, exc_info=True)
+            await self._log_login_debug_context("login_outer_exception")
             raise e
 
     def _is_logged_in(self) -> bool:
@@ -213,6 +236,98 @@ class OuraAutomator:
         if not self.page: return False
         url = self.page.url.rstrip('/')
         return (url == self.base_url) and ("login" not in url) and ("authn" not in url)
+
+    async def _login_visibility_snapshot(self) -> Dict[str, Any]:
+        """Parallel visibility checks for login/OTP-related controls (debug aid)."""
+        if not self.page:
+            return {}
+        checks = [
+            ("otp_input_name", self.page.locator("input[name='otp']").first),
+            ("otp_input_id", self.page.locator("#otp-code").first),
+            ("verification_code", self.page.locator("input[name='verification_code']").first),
+            ("password", self.page.locator("input[type='password']").first),
+            ("username", self.page.locator("input[name='username']").first),
+            ("email_type", self.page.locator("input[type='email']").first),
+            ("submit", self.page.locator("button[type='submit']").first),
+            ("send_code_intermediate", self.page.locator("button[name='selectedId']").first),
+        ]
+        out: Dict[str, Any] = {}
+
+        async def one(key: str, loc):
+            try:
+                out[key] = await loc.is_visible()
+            except Exception as ex:
+                out[key] = f"error:{ex}"
+
+        await asyncio.gather(*(one(k, loc) for k, loc in checks))
+        return out
+
+    async def _log_login_debug_context(self, reason: str) -> None:
+        """Emit detailed diagnostics when login ends in an unexpected state."""
+        if not self.page:
+            logger.warning("[login-debug:%s] page is None", reason)
+            return
+        try:
+            title = await self.page.title()
+        except Exception as e:
+            title = f"<error reading title: {e}>"
+        snap = await self._login_visibility_snapshot()
+        logger.warning(
+            "[login-debug:%s] url=%r title=%r is_logged_in=%s snapshot=%s",
+            reason,
+            self.page.url,
+            title,
+            self._is_logged_in(),
+            snap,
+        )
+
+    def _url_indicates_auth_portal_error(self) -> bool:
+        if not self.page:
+            return False
+        u = self.page.url.lower()
+        return "error_prompt" in u or "oauth_error" in u
+
+    async def _extract_auth_portal_error_message(self) -> Optional[str]:
+        """Best-effort visible error text from Oura / ForgeRock IdP pages."""
+        if not self.page:
+            return None
+        selectors = (
+            "[role='alert']",
+            "[data-testid*='error']",
+            ".alert-danger",
+            ".alert",
+            ".error-message",
+            "[class*='error']",
+            "h1",
+            "main",
+        )
+        for sel in selectors:
+            try:
+                loc = self.page.locator(sel).first
+                if await loc.is_visible(timeout=2500):
+                    text = (await loc.inner_text()).strip()
+                    text = " ".join(text.split())
+                    if text and len(text) <= 1200:
+                        return text
+            except Exception:
+                continue
+        return None
+
+    async def _raise_if_auth_portal_error(self, context: str) -> None:
+        if not self._url_indicates_auth_portal_error():
+            return
+        msg = await self._extract_auth_portal_error_message()
+        await self._log_login_debug_context(f"auth_portal_error:{context}")
+        detail = msg or "No message extracted from page"
+        hint = ""
+        try:
+            if config_manager.get_config().get("headless", True):
+                hint = " If this keeps happening, try turning off headless mode in settings."
+        except Exception:
+            pass
+        raise Exception(
+            f"Oura sign-in rejected this step ({context}): {detail}. URL: {self.page.url}{hint}"
+        )
 
     async def _perform_login_actions(self) -> Dict[str, str]:
         """Interacts with the login form, handling email submission and checking for OTP requirements."""
@@ -229,18 +344,26 @@ class OuraAutomator:
             raise Exception("Could not find email input.")
 
         await email_input.fill(self.email)
-        await self.page.dispatch_event("input[name='username']", 'input') 
-        
+        # Always fire events on the field we actually filled (username vs type=email).
+        await email_input.dispatch_event("input")
+        await email_input.dispatch_event("change")
+        logger.info("Email filled; url=%r", self.page.url)
+
         await self._click_submit()
-        
+        logger.info("After submit click; url=%r", self.page.url)
+
+        await self._raise_if_auth_portal_error("after_email_submit")
+
         # Check for OTP or Password requirements
         otp_status = await self._check_otp_screen()
         if otp_status:
+            logger.info("OTP flow detected after submit: %s", otp_status)
             return otp_status
 
         # Password fallback (unlikely for Oura's current flow but retained for robustness)
         password_input = self.page.locator("input[type='password']")
         if await password_input.is_visible():
+             logger.info("Password field visible; attempting password entry")
              if not self.password:
                  raise Exception("Password required but not configured.")
              await password_input.fill(self.password)
@@ -248,11 +371,17 @@ class OuraAutomator:
         
         # Final Verification
         await self.page.wait_for_load_state("networkidle")
+        logger.info("Post-submit verification; url=%r logged_in=%s", self.page.url, self._is_logged_in())
         if not self._is_logged_in():
+             await self._raise_if_auth_portal_error("final_check")
              # Re-check OTP in case of network lag
              if await self._check_otp_screen():
+                 logger.info("OTP screen appeared on second check")
                  return {"status": "otp_required", "message": "OTP required"}
-             raise Exception("Login failed or incomplete.")
+             await self._log_login_debug_context("failed_not_logged_in")
+             raise Exception(
+                 f"Login failed or incomplete. Last URL: {self.page.url}"
+             )
         
         logger.info("Login process completed successfully.")
         await self.save_context()
@@ -260,16 +389,34 @@ class OuraAutomator:
 
     async def _click_submit(self):
         """Clicks the submit button, handling various potential selectors."""
+        prev_url = self.page.url
         submit_btn = self.page.locator("button[type='submit']")
         if not await submit_btn.is_visible():
             submit_btn = self.page.locator("#submit-button")
-        
+
         if await submit_btn.is_visible():
             await submit_btn.click()
         else:
             await self.page.keyboard.press("Enter")
-        
-        await self.page.wait_for_timeout(3000)
+
+        try:
+            await self.page.wait_for_function(
+                "(prev) => window.location.href !== prev",
+                arg=prev_url,
+                timeout=45000,
+            )
+        except Exception:
+            logger.info(
+                "No navigation away from previous URL after submit (url=%r)",
+                self.page.url,
+            )
+
+        try:
+            await self.page.wait_for_load_state("networkidle", timeout=30000)
+        except Exception:
+            logger.info("networkidle after submit timed out; url=%r", self.page.url)
+
+        await self.page.wait_for_timeout(1500)
 
     async def _check_otp_screen(self):
         """Checks if OTP screen is active and handles the 'Send Code' intermediate step if present."""
@@ -289,6 +436,11 @@ class OuraAutomator:
         if await otp_input_name.is_visible() or await otp_input_id.is_visible():
             logger.info("OTP Login required.")
             return {"status": "otp_required", "message": "OTP required"}
+        logger.info(
+            "_check_otp_screen: no OTP UI yet (url=%r intermediate_visible=%s)",
+            self.page.url if self.page else None,
+            await intermediate_btn.is_visible() if self.page else False,
+        )
         return None
 
     async def submit_otp(self, otp: str):

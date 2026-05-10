@@ -166,10 +166,13 @@ async def chat(request: ChatRequest):
 @router.post("/api/automation/start-login")
 async def start_login(request: LoginRequest):
     """Initiates the login process via Playwright."""
+    logger.info("start-login requested for email=%s", request.email)
     try:
         result = await automator.start_login(request.email)
+        logger.info("start-login finished: %s", result)
         return result
     except Exception as e:
+        logger.exception("start-login failed for email=%s", request.email)
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.post("/api/automation/submit-otp")
