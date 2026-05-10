@@ -2,7 +2,7 @@ name: "Cracked Oura"
 version: "0.1.0"
 slug: "cracked-oura"
 description: "Local Oura ring data dashboard — no subscription required"
-url: "https://github.com/EIrno/Cracked-Oura"
+url: "https://github.com/kirill578/Cracked-Oura"
 arch:
   - amd64
   - aarch64
@@ -28,4 +28,4 @@ schema:
   llm_model: "str"
   telegram_bot_token: "str?"
   telegram_chat_id: "str?"
-image: "ghcr.io/eirno/{arch}-addon-cracked-oura"
+image: "ghcr.io/kirill578/{arch}-addon-cracked-oura"
