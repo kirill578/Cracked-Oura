@@ -11,15 +11,43 @@ export interface ChatMessage {
     thoughts?: any[];
 }
 
+export type ScheduleCadence = 'daily' | 'weekly';
+
+/** GET /api/settings response. Times are exchanged as either:
+ *  - the user's wall-clock + IANA tz (the source of truth, DST-stable), or
+ *  - precomputed UTC instants for derived fields like `next_run_utc`.
+ */
+export interface SettingsResponse {
+    daily_sync_time: string;
+    email: string;
+    schedule_cadence: ScheduleCadence;
+    schedule_time_local: string;     // HH:MM in schedule_timezone
+    schedule_timezone: string;       // IANA, e.g. "America/Chicago"
+    schedule_day_of_week: number;    // 0=Mon..6=Sun
+    schedule_jitter_minutes: number;
+    next_run_utc: string | null;
+    last_run_utc: string | null;
+}
+
+export interface SettingsUpdate {
+    email?: string;
+    schedule_cadence?: ScheduleCadence;
+    schedule_time_local?: string;
+    schedule_timezone?: string;
+    schedule_day_of_week?: number;
+    schedule_jitter_minutes?: number;
+    daily_sync_time?: string;
+}
+
 export const api = {
     // --- Settings & Automation ---
-    getSettings: async () => {
+    getSettings: async (): Promise<SettingsResponse> => {
         const res = await fetch(`${BASE_URL}/api/settings`);
         if (!res.ok) throw new Error('Failed to fetch settings');
         return res.json();
     },
 
-    saveSettings: async (settings: { daily_sync_time: string; email?: string }) => {
+    saveSettings: async (settings: SettingsUpdate) => {
         const res = await fetch(`${BASE_URL}/api/settings`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },

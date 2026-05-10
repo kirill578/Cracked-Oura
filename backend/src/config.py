@@ -31,9 +31,17 @@ class ConfigManager:
         if not os.path.exists(self.config_path):
             default_config = {
                 "email": "",
-                "schedule_time": "11:00", # Default 11 AM
+                # Legacy field kept for backward compatibility; new code reads
+                # schedule_time_local + schedule_timezone instead.
+                "schedule_time": "08:00",
+                "schedule_cadence": "daily",        # "daily" | "weekly"
+                "schedule_time_local": "08:00",     # HH:MM wall-clock in schedule_timezone
+                "schedule_timezone": "UTC",          # IANA tz; UI overrides to browser tz on first save
+                "schedule_day_of_week": 6,           # 0=Mon ... 6=Sun (only used when weekly)
+                "schedule_jitter_minutes": 20,       # uniform [0, N] minute delay applied per occurrence
+                "next_run": None,                    # UTC ISO string; jittered fire time
+                "next_run_base": None,               # UTC ISO string; un-jittered base
                 "last_run": None,
-                "next_run": None,
                 "status": "Idle",
                 "is_active": True,
                 "headless": True,

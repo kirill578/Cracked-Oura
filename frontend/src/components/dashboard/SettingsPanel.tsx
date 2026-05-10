@@ -2,16 +2,43 @@ import { useState, useEffect } from 'react';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { X, Loader2, AlertCircle, Download, Copy, Upload } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { cn } from "@/lib/utils";
-import { api, type AutomationStatusResponse } from '@/lib/api';
+import { api, type AutomationStatusResponse, type ScheduleCadence } from '@/lib/api';
 
 interface SettingsPanelProps {
     onClose: () => void;
 }
 
 type AutomationStatus = AutomationStatusResponse['status'];
+
+const WEEKDAY_LABELS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
+
+/** IANA tz of the browser, used as the default for new schedules. */
+const BROWSER_TZ = (() => {
+    try {
+        return Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
+    } catch {
+        return "UTC";
+    }
+})();
+
+/** Formats a UTC ISO instant as a friendly string in the browser's tz. */
+function formatInBrowserTz(utcIso: string | null): string {
+    if (!utcIso) return "—";
+    const d = new Date(utcIso);
+    if (Number.isNaN(d.getTime())) return "—";
+    return d.toLocaleString(undefined, {
+        weekday: 'short',
+        month: 'short',
+        day: 'numeric',
+        hour: 'numeric',
+        minute: '2-digit',
+        timeZoneName: 'short',
+    });
+}
 
 export function SettingsPanel({ onClose }: SettingsPanelProps) {
     const [status, setStatus] = useState<AutomationStatus>('idle');
@@ -22,25 +49,67 @@ export function SettingsPanel({ onClose }: SettingsPanelProps) {
     const [logs, setLogs] = useState<string[]>([]);
     const [activeTab, setActiveTab] = useState<'automation' | 'layout'>('automation');
 
-    const [dailySyncTime, setDailySyncTime] = useState("09:00");
+    // Schedule state. `scheduleTimeLocal` is wall-clock in `scheduleTimezone`, so
+    // "08:00 America/Chicago" stays at 8 AM local through DST. The browser tz is
+    // the default on first save; the user can override.
+    const [cadence, setCadence] = useState<ScheduleCadence>('daily');
+    const [scheduleTimeLocal, setScheduleTimeLocal] = useState("08:00");
+    const [scheduleTimezone, setScheduleTimezone] = useState(BROWSER_TZ);
+    const [dayOfWeek, setDayOfWeek] = useState(6); // 0=Mon..6=Sun
+    const [jitterMinutes, setJitterMinutes] = useState(20);
+    const [nextRunUtc, setNextRunUtc] = useState<string | null>(null);
+    const [lastRunUtc, setLastRunUtc] = useState<string | null>(null);
 
     useEffect(() => {
-        // Fetch settings on mount
         api.getSettings()
             .then(data => {
-                if (data.daily_sync_time) setDailySyncTime(data.daily_sync_time);
                 if (data.email) setEmail(data.email);
+                if (data.schedule_time_local) setScheduleTimeLocal(data.schedule_time_local);
+                if (data.schedule_cadence) setCadence(data.schedule_cadence);
+                // If the server has no real tz yet (legacy "UTC" default), seed
+                // it with the browser tz so the user's choice "8 AM" lands in
+                // the timezone they're sitting in right now.
+                if (data.schedule_timezone && data.schedule_timezone !== "UTC") {
+                    setScheduleTimezone(data.schedule_timezone);
+                } else {
+                    setScheduleTimezone(BROWSER_TZ);
+                }
+                if (typeof data.schedule_day_of_week === 'number') setDayOfWeek(data.schedule_day_of_week);
+                if (typeof data.schedule_jitter_minutes === 'number') setJitterMinutes(data.schedule_jitter_minutes);
+                setNextRunUtc(data.next_run_utc ?? null);
+                setLastRunUtc(data.last_run_utc ?? null);
             })
             .catch(err => console.error("Failed to fetch settings", err));
     }, []);
 
     const addLog = (msg: string) => setLogs(prev => [...prev, `[${new Date().toLocaleTimeString()}] ${msg}`]);
 
+    const refreshNextRun = async () => {
+        try {
+            const data = await api.getSettings();
+            setNextRunUtc(data.next_run_utc ?? null);
+            setLastRunUtc(data.last_run_utc ?? null);
+        } catch (e) {
+            // Non-fatal — display stale.
+        }
+    };
+
     const handleSaveSettings = async () => {
         setLoading(true);
         try {
-            await api.saveSettings({ daily_sync_time: dailySyncTime, email });
-            addLog(`Settings saved: Daily sync at ${dailySyncTime}`);
+            await api.saveSettings({
+                email,
+                schedule_cadence: cadence,
+                schedule_time_local: scheduleTimeLocal,
+                schedule_timezone: scheduleTimezone,
+                schedule_day_of_week: dayOfWeek,
+                schedule_jitter_minutes: jitterMinutes,
+            });
+            const cadenceText = cadence === 'weekly'
+                ? `${WEEKDAY_LABELS[dayOfWeek]}s at ${scheduleTimeLocal}`
+                : `daily at ${scheduleTimeLocal}`;
+            addLog(`Schedule saved: ${cadenceText} ${scheduleTimezone} (±${jitterMinutes}m jitter)`);
+            await refreshNextRun();
         } catch (err: any) {
             setError(err.message);
         } finally {
@@ -68,8 +137,9 @@ export function SettingsPanel({ onClose }: SettingsPanelProps) {
         setError(null);
         addLog(`Starting login for ${email}...`);
         try {
-            // Auto-save settings to persist email
-            await api.saveSettings({ daily_sync_time: dailySyncTime, email });
+            // Persist just the email so a re-open prefills it. The full schedule
+            // is saved separately via the explicit Save button.
+            await api.saveSettings({ email });
 
             const data = await api.startLogin(email);
             addLog(data.message);
@@ -217,20 +287,112 @@ export function SettingsPanel({ onClose }: SettingsPanelProps) {
             <div className="flex-1 p-6 space-y-6 overflow-y-auto">
                 {activeTab === 'automation' && (
                     <>
-                        {/* Automation Config */}
+                        {/* Schedule */}
                         <div className="space-y-4">
-                            <h3 className="font-medium text-sm text-muted-foreground uppercase tracking-wider">Configuration</h3>
+                            <h3 className="font-medium text-sm text-muted-foreground uppercase tracking-wider">Schedule</h3>
+
                             <div className="space-y-2">
-                                <Label>Daily Sync Time</Label>
+                                <Label>Cadence</Label>
+                                <div className="grid grid-cols-2 gap-2">
+                                    <Button
+                                        type="button"
+                                        variant={cadence === 'daily' ? 'default' : 'outline'}
+                                        onClick={() => setCadence('daily')}
+                                    >
+                                        Once a day
+                                    </Button>
+                                    <Button
+                                        type="button"
+                                        variant={cadence === 'weekly' ? 'default' : 'outline'}
+                                        onClick={() => setCadence('weekly')}
+                                    >
+                                        Once a week
+                                    </Button>
+                                </div>
+                            </div>
+
+                            {cadence === 'weekly' && (
+                                <div className="space-y-2">
+                                    <Label>Day of week</Label>
+                                    <Select value={String(dayOfWeek)} onValueChange={v => setDayOfWeek(Number(v))}>
+                                        <SelectTrigger>
+                                            <SelectValue />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            {WEEKDAY_LABELS.map((label, idx) => (
+                                                <SelectItem key={idx} value={String(idx)}>{label}</SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+                            )}
+
+                            <div className="space-y-2">
+                                <Label>Time of day</Label>
+                                <Input
+                                    type="time"
+                                    value={scheduleTimeLocal}
+                                    onChange={e => setScheduleTimeLocal(e.target.value)}
+                                />
+                                <p className="text-[11px] text-muted-foreground">
+                                    Wall-clock time in <span className="font-mono">{scheduleTimezone}</span>.
+                                    DST-stable: 8:00 stays 8:00 across spring/fall changes.
+                                </p>
+                            </div>
+
+                            <div className="space-y-2">
+                                <Label>Timezone</Label>
                                 <div className="flex gap-2">
                                     <Input
-                                        type="time"
-                                        value={dailySyncTime}
-                                        onChange={e => setDailySyncTime(e.target.value)}
+                                        value={scheduleTimezone}
+                                        onChange={e => setScheduleTimezone(e.target.value)}
+                                        placeholder="Region/City"
+                                        className="font-mono text-xs"
                                     />
-                                    <Button onClick={handleSaveSettings} disabled={loading} variant="outline">
-                                        Save
-                                    </Button>
+                                    {scheduleTimezone !== BROWSER_TZ && (
+                                        <Button
+                                            type="button"
+                                            variant="outline"
+                                            onClick={() => setScheduleTimezone(BROWSER_TZ)}
+                                            title={`Use browser timezone (${BROWSER_TZ})`}
+                                        >
+                                            Use browser
+                                        </Button>
+                                    )}
+                                </div>
+                                <p className="text-[11px] text-muted-foreground">
+                                    Browser timezone: <span className="font-mono">{BROWSER_TZ}</span>.
+                                </p>
+                            </div>
+
+                            <div className="space-y-2">
+                                <Label>Random delay window (minutes)</Label>
+                                <Input
+                                    type="number"
+                                    min={0}
+                                    max={240}
+                                    value={jitterMinutes}
+                                    onChange={e => setJitterMinutes(Math.max(0, Math.min(240, Number(e.target.value) || 0)))}
+                                />
+                                <p className="text-[11px] text-muted-foreground">
+                                    Each fire is delayed by a uniform random amount between 0 and this many minutes
+                                    after the scheduled time, so requests don't all hit at the exact same instant.
+                                </p>
+                            </div>
+
+                            <Button onClick={handleSaveSettings} disabled={loading} className="w-full">
+                                {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                                Save schedule
+                            </Button>
+
+                            <div className="rounded-md border bg-secondary/30 p-3 space-y-1 text-xs">
+                                <div className="flex justify-between">
+                                    <span className="text-muted-foreground">Next run</span>
+                                    <span className="font-medium">{formatInBrowserTz(nextRunUtc)}</span>
+                                </div>
+                                <div className="flex justify-between">
+                                    <span className="text-muted-foreground">Last run</span>
+                                    <span className="font-medium">{formatInBrowserTz(lastRunUtc)}</span>
                                 </div>
                             </div>
                         </div>

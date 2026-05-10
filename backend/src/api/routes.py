@@ -51,8 +51,14 @@ class OTPRequest(BaseModel):
     otp: str
 
 class SettingsRequest(BaseModel):
-    daily_sync_time: str
+    # Legacy field — still accepted; if provided, mirrors into schedule_time_local
+    daily_sync_time: Optional[str] = None
     email: Optional[str] = None
+    schedule_cadence: Optional[str] = None          # "daily" | "weekly"
+    schedule_time_local: Optional[str] = None       # HH:MM in schedule_timezone
+    schedule_timezone: Optional[str] = None         # IANA tz, e.g. "America/Chicago"
+    schedule_day_of_week: Optional[int] = None      # 0=Mon ... 6=Sun
+    schedule_jitter_minutes: Optional[int] = None
 
 class Dashboard(BaseModel):
     id: str
@@ -226,25 +232,98 @@ async def clear_session():
 
 @router.post("/api/settings")
 async def save_settings(request: SettingsRequest):
-    """Updates global application settings."""
+    """Updates global application settings.
+
+    The schedule is defined by (schedule_time_local + schedule_timezone) so that
+    a wall-clock time like "08:00 America/Chicago" survives DST transitions and
+    server timezone changes. The frontend should detect the browser's IANA tz
+    and pass it as `schedule_timezone`; the backend converts to UTC at fire time.
+    Communication of derived instants (e.g. `next_run_utc`) is in UTC.
+    """
     try:
-        updates = {"schedule_time": request.daily_sync_time}
+        updates: dict = {}
         if request.email is not None:
-             updates["email"] = request.email
-             
+            updates["email"] = request.email
+
+        # Schedule fields
+        if request.schedule_cadence is not None:
+            if request.schedule_cadence not in ("daily", "weekly"):
+                raise HTTPException(status_code=400, detail="schedule_cadence must be 'daily' or 'weekly'")
+            updates["schedule_cadence"] = request.schedule_cadence
+
+        # Accept either the new or legacy field as the time-of-day source
+        time_local = request.schedule_time_local or request.daily_sync_time
+        if time_local is not None:
+            try:
+                hh, mm = time_local.split(":")
+                h, m = int(hh), int(mm)
+                if not (0 <= h < 24 and 0 <= m < 60):
+                    raise ValueError
+            except Exception:
+                raise HTTPException(status_code=400, detail="schedule_time_local must be 'HH:MM'")
+            updates["schedule_time_local"] = f"{h:02d}:{m:02d}"
+            # Mirror into legacy field for any consumer still reading it
+            updates["schedule_time"] = updates["schedule_time_local"]
+
+        if request.schedule_timezone is not None:
+            # Validate via zoneinfo
+            from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
+            try:
+                ZoneInfo(request.schedule_timezone)
+            except ZoneInfoNotFoundError:
+                raise HTTPException(status_code=400, detail=f"Unknown timezone: {request.schedule_timezone}")
+            updates["schedule_timezone"] = request.schedule_timezone
+
+        if request.schedule_day_of_week is not None:
+            dow = int(request.schedule_day_of_week)
+            if not (0 <= dow <= 6):
+                raise HTTPException(status_code=400, detail="schedule_day_of_week must be 0..6 (Mon=0)")
+            updates["schedule_day_of_week"] = dow
+
+        if request.schedule_jitter_minutes is not None:
+            jitter = int(request.schedule_jitter_minutes)
+            if not (0 <= jitter <= 240):
+                raise HTTPException(status_code=400, detail="schedule_jitter_minutes must be 0..240")
+            updates["schedule_jitter_minutes"] = jitter
+
+        # Any schedule change invalidates the cached next-run so the worker
+        # recomputes (and re-rolls jitter) on the next tick.
+        schedule_keys = {"schedule_cadence", "schedule_time_local", "schedule_timezone",
+                         "schedule_day_of_week", "schedule_jitter_minutes"}
+        if schedule_keys & updates.keys():
+            updates["next_run"] = None
+            updates["next_run_base"] = None
+
         config_manager.update_config(**updates)
         return {"message": "Settings saved"}
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.get("/api/settings")
 async def get_settings():
-    """Retrieves current application settings."""
+    """Returns current settings.
+
+    Times are returned both as the user's chosen wall-clock (`schedule_time_local`
+    + `schedule_timezone`, the source of truth) and as a UTC instant
+    (`next_run_utc`) for the next scheduled fire so the frontend can display
+    it in browser-local time without re-implementing the schedule logic.
+    """
     try:
         config = config_manager.get_config()
+        time_local = config.get("schedule_time_local") or config.get("schedule_time", "08:00")
         return {
-            "daily_sync_time": config.get("schedule_time", "09:00"),
-            "email": config.get("email", "")
+            # Legacy alias retained so the existing UI keeps working during rollout
+            "daily_sync_time": time_local,
+            "email": config.get("email", ""),
+            "schedule_cadence": config.get("schedule_cadence", "daily"),
+            "schedule_time_local": time_local,
+            "schedule_timezone": config.get("schedule_timezone", "UTC"),
+            "schedule_day_of_week": int(config.get("schedule_day_of_week", 6)),
+            "schedule_jitter_minutes": int(config.get("schedule_jitter_minutes", 20)),
+            "next_run_utc": config.get("next_run"),
+            "last_run_utc": config.get("last_run"),
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

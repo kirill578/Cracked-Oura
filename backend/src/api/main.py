@@ -5,7 +5,9 @@ from backend.src.database import init_db
 
 import asyncio
 import logging
-from datetime import datetime, timedelta
+import random
+from datetime import datetime, timedelta, timezone
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 from backend.src.automation import automator
 from backend.src.ingestion import OuraParser
 from backend.src.database import SessionLocal
@@ -397,9 +399,9 @@ async def process_ingestion(zip_path):
         parser.parse_zip(zip_path)
         logger.info("Background worker: Ingestion successful.")
         
-        # Success!
-        now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        config_manager.update_status("Idle", last_run=now_str)
+        # Success! Persist last_run as UTC ISO; the UI converts to browser tz.
+        now_iso = datetime.now(timezone.utc).isoformat()
+        config_manager.update_status("Idle", last_run=now_iso)
         
     except Exception as e:
         logger.error(f"Background worker: Ingestion failed: {e}")
@@ -408,41 +410,131 @@ async def process_ingestion(zip_path):
         db.close()
 
 
+def _resolve_tz(name: str | None) -> ZoneInfo:
+    """Returns a ZoneInfo for `name`, falling back to UTC if it can't be loaded."""
+    try:
+        return ZoneInfo(name) if name else ZoneInfo("UTC")
+    except ZoneInfoNotFoundError:
+        logger.warning(f"Unknown timezone {name!r}; falling back to UTC")
+        return ZoneInfo("UTC")
+
+
+def _compute_next_base_utc(cfg: dict, after_utc: datetime) -> datetime:
+    """Computes the next un-jittered scheduled fire instant strictly after `after_utc`.
+
+    Uses the user's wall-clock (`schedule_time_local`) interpreted in
+    `schedule_timezone` so DST shifts don't drag the time. For weekly cadence,
+    `schedule_day_of_week` selects the target weekday (0=Mon..6=Sun, ISO).
+    """
+    tz = _resolve_tz(cfg.get("schedule_timezone"))
+    time_local = cfg.get("schedule_time_local") or cfg.get("schedule_time", "08:00")
+    try:
+        h, m = map(int, time_local.split(":"))
+    except Exception:
+        h, m = 8, 0
+
+    cadence = cfg.get("schedule_cadence", "daily")
+    after_local = after_utc.astimezone(tz)
+
+    if cadence == "weekly":
+        target_dow = int(cfg.get("schedule_day_of_week", 6))
+        # weekday(): Mon=0..Sun=6 (matches our convention)
+        days_ahead = (target_dow - after_local.weekday()) % 7
+        candidate = after_local.replace(hour=h, minute=m, second=0, microsecond=0) + timedelta(days=days_ahead)
+        if candidate <= after_local:
+            candidate = candidate + timedelta(days=7)
+    else:  # daily
+        candidate = after_local.replace(hour=h, minute=m, second=0, microsecond=0)
+        if candidate <= after_local:
+            candidate = candidate + timedelta(days=1)
+
+    return candidate.astimezone(timezone.utc)
+
+
+def _ensure_next_run(cfg: dict, now_utc: datetime) -> tuple[datetime, datetime]:
+    """Reads (or computes & persists) the next base + jittered fire time in UTC.
+
+    The persisted base is used as the floor for advancing after a fire and as
+    the seed identity for the jitter draw — restarts won't re-roll the offset.
+    """
+    base_iso = cfg.get("next_run_base")
+    fire_iso = cfg.get("next_run")
+    base = _parse_utc_iso(base_iso)
+    fire = _parse_utc_iso(fire_iso)
+
+    if base is None or fire is None or base < now_utc - timedelta(days=14):
+        base = _compute_next_base_utc(cfg, now_utc)
+        fire = _apply_jitter(base, cfg)
+        config_manager.update_config(
+            next_run_base=base.isoformat(),
+            next_run=fire.isoformat(),
+        )
+        logger.info(f"Scheduler: next base={base.isoformat()} fire={fire.isoformat()}")
+
+    return base, fire
+
+
+def _apply_jitter(base_utc: datetime, cfg: dict) -> datetime:
+    """Adds a uniform random delay in [0, jitter_minutes] to `base_utc`."""
+    jitter_max = max(0, int(cfg.get("schedule_jitter_minutes", 20)))
+    if jitter_max == 0:
+        return base_utc
+    delay_seconds = random.randint(0, jitter_max * 60)
+    return base_utc + timedelta(seconds=delay_seconds)
+
+
+def _parse_utc_iso(s: str | None) -> datetime | None:
+    if not s:
+        return None
+    try:
+        dt = datetime.fromisoformat(s)
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=timezone.utc)
+        return dt.astimezone(timezone.utc)
+    except Exception:
+        return None
+
+
 async def background_worker():
+    """Tick loop that fires `run_ingestion_task` per the configured schedule.
+
+    The schedule is tz-aware: `schedule_time_local` is interpreted in
+    `schedule_timezone` (IANA) every iteration, so a "08:00 America/Chicago"
+    target stays at local 8 AM through DST regardless of the host's clock.
+    Jitter is drawn once per occurrence and persisted, so it survives restarts.
+    """
     logger.info("Background worker started.")
     while True:
         try:
-            # Check every minute if it's time to run
-            now = datetime.now()
+            now_utc = datetime.now(timezone.utc)
             cfg = config_manager.get_config()
-            
-            # Calculate next run time for display
-            schedule_time_str = cfg.get("schedule_time", "11:00")
-            try:
-                sh, sm = map(int, schedule_time_str.split(":"))
-                run_today = now.replace(hour=sh, minute=sm, second=0, microsecond=0)
-                if now > run_today:
-                    next_run = run_today + timedelta(days=1)
-                else:
-                    next_run = run_today
-                
-                config_manager.update_status(cfg.get("status", "Idle"), next_run=next_run.strftime("%Y-%m-%d %H:%M:%S"))
 
-                if now.hour == sh and now.minute == sm:
-                     await run_ingestion_task()
-                
-                # If in "Waiting" state, poll every 5 minutes            
-                elif "Waiting" in cfg.get("status", ""):
-                    if now.minute % 5 == 0:
-                        logger.info("Background worker: Polling for export status...")
-                        await run_ingestion_task()
-                     
+            try:
+                base_utc, fire_utc = _ensure_next_run(cfg, now_utc)
+
+                if now_utc >= fire_utc:
+                    logger.info(f"Scheduler: firing scheduled run (base={base_utc.isoformat()}, "
+                                f"fire={fire_utc.isoformat()}, now={now_utc.isoformat()})")
+                    # Advance the schedule BEFORE running so a long-running job
+                    # can't fire repeatedly while it's still in progress.
+                    next_base = _compute_next_base_utc(cfg, base_utc)
+                    next_fire = _apply_jitter(next_base, cfg)
+                    config_manager.update_config(
+                        next_run_base=next_base.isoformat(),
+                        next_run=next_fire.isoformat(),
+                    )
+                    await run_ingestion_task()
+
+                # If we're parked waiting for OTP, retry at most every 5 minutes.
+                elif "Waiting" in cfg.get("status", "") and now_utc.minute % 5 == 0:
+                    logger.info("Background worker: Polling for export status...")
+                    await run_ingestion_task()
+
             except Exception as e:
                 logger.error(f"Scheduler error: {e}")
 
-            # Sleep 60 seconds
-            await asyncio.sleep(60)
-                    
+            await asyncio.sleep(30)
+
         except Exception as e:
             logger.error(f"Background worker loop error: {e}")
             await asyncio.sleep(60)
