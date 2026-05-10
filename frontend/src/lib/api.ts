@@ -1,4 +1,8 @@
-const BASE_URL = 'http://localhost:8000';
+// Derive the app's base URL from the page's own URL so API calls work both
+// when accessed directly (http://host:8000/) and through HA ingress
+// (https://ha-host/api/hassio_ingress/<token>/), where an absolute '/api/…'
+// path would bypass the ingress proxy and hit HA's own API instead.
+const BASE_URL = new URL('.', document.baseURI).href.replace(/\/$/, '');
 
 export interface AutomationStatusResponse {
     status: 'idle' | 'login_needed' | 'otp_needed' | 'logged_in' | 'exporting' | 'ready_to_download' | 'downloading' | 'completed' | 'error';

@@ -22,19 +22,29 @@ from backend.src.paths import get_user_data_dir
 import logging
 import os
 
-log_dir = get_user_data_dir()
-log_file = os.path.join(log_dir, "backend_debug.log")
+_ha_addon = os.environ.get("HA_ADDON") == "1"
 
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
-    handlers=[
-        logging.FileHandler(log_file),
-        logging.StreamHandler()
-    ]
-)
-logger = logging.getLogger("API")
-logger.info(f"API Starting... Logging to {log_file}")
+if _ha_addon:
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+        handlers=[logging.StreamHandler()],
+    )
+    logger = logging.getLogger("API")
+    logger.info("API Starting... (HA add-on mode, logging to stdout)")
+else:
+    log_dir = get_user_data_dir()
+    log_file = os.path.join(log_dir, "backend_debug.log")
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+        handlers=[
+            logging.FileHandler(log_file),
+            logging.StreamHandler(),
+        ],
+    )
+    logger = logging.getLogger("API")
+    logger.info(f"API Starting... Logging to {log_file}")
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -147,10 +157,21 @@ origins = [
     "http://localhost:8000", # Backend
 ]
 
+_cors_origins = (
+    []
+    if _ha_addon
+    else [
+        "http://localhost",
+        "http://localhost:3000",
+        "http://localhost:5173",
+        "http://localhost:8000",
+    ]
+)
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
+    allow_origins=_cors_origins,
+    allow_credentials=not _ha_addon,
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -570,27 +591,25 @@ else:
 if __name__ == "__main__":
     import uvicorn
     import sys
-    
-    # Check if running as a PyInstaller bundle
-    if getattr(sys, 'frozen', False):
+
+    if _ha_addon:
+        # HA add-on: bind all interfaces so the supervisor can reach us
+        port = int(os.environ.get("PORT", "8000"))
+        uvicorn.run(app, host="0.0.0.0", port=port, reload=False)
+    elif getattr(sys, 'frozen', False):
         try:
-            # Production (Frozen)
+            # Production (Frozen / PyInstaller)
             uvicorn.run(app, host="127.0.0.1", port=8000, reload=False)
         except Exception as e:
-            # Emergency logging if startup fails
-            from backend.src.paths import get_user_data_dir
-            import os
             import traceback
-            
             try:
                 log_path = os.path.join(get_user_data_dir(), "startup_crash.log")
                 with open(log_path, "w", encoding="utf-8") as f:
                     f.write(f"Startup Crash: {e}\n")
                     f.write(traceback.format_exc())
-            except:
-                pass # Failed to write log
+            except Exception:
+                pass
             raise e
     else:
         # Development
-        # Run the server with auto-reload
         uvicorn.run("backend.src.api.main:app", host="0.0.0.0", port=8000, reload=True, reload_dirs=["backend"])

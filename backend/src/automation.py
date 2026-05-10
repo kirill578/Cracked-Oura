@@ -21,7 +21,8 @@ class OuraAutomator:
         self.page: Optional[Page] = None
         self.playwright = None
         self._is_initialized = False
-        self.storage_state_path = os.path.join(os.getcwd(), "oura_session.json")
+        from .paths import get_user_data_dir
+        self.storage_state_path = os.path.join(get_user_data_dir(), "oura_session.json")
         self.email: Optional[str] = None
         self.password: Optional[str] = None
         self.base_url = "https://membership.ouraring.com"
@@ -29,18 +30,27 @@ class OuraAutomator:
 
         # Configure Playwright Browser Path
         from .paths import get_user_data_dir
-        
-        # Use a writable directory for browsers
-        self.browser_dir = os.path.join(get_user_data_dir(), "browsers")
-        os.environ["PLAYWRIGHT_BROWSERS_PATH"] = self.browser_dir
+
+        self._ha_addon = os.environ.get("HA_ADDON") == "1"
+        if self._ha_addon:
+            # In the HA add-on, Chromium is baked into the image; skip downloading.
+            self.browser_dir = None
+            self._chromium_executable = os.environ.get("CHROMIUM_EXECUTABLE_PATH") or "/usr/bin/chromium-browser"
+        else:
+            # Use a writable directory for the Playwright-managed browser download
+            self.browser_dir = os.path.join(get_user_data_dir(), "browsers")
+            os.environ["PLAYWRIGHT_BROWSERS_PATH"] = self.browser_dir
+            self._chromium_executable = None
 
     async def initialize(self, headless: Optional[bool] = None):
         """Initializes the Playwright browser session."""
         if self._is_initialized:
             return
 
-        # Ensure browser is installed
-        await self._ensure_browser_installed()
+        # In HA add-on mode use the system Chromium baked into the image;
+        # otherwise ensure the Playwright-managed download is present.
+        if not self._ha_addon:
+            await self._ensure_browser_installed()
 
         # If headless not provided, read from config
         if headless is None:
@@ -55,14 +65,26 @@ class OuraAutomator:
 
         logger.info(f"Initializing Playwright (Headless: {headless})")
         self.playwright = await async_playwright().start()
-        
+
+        launch_args = ["--no-sandbox", "--disable-setuid-sandbox"]
+        if not self._ha_addon:
+            launch_args.append("--start-maximized")
+
+        launch_kwargs: dict = {"headless": headless, "args": launch_args}
+        if self._chromium_executable:
+            launch_kwargs["executable_path"] = self._chromium_executable
+            logger.info(f"Using system Chromium: {self._chromium_executable}")
+
         try:
-            self.browser = await self.playwright.chromium.launch(headless=headless, args=["--start-maximized"])
+            self.browser = await self.playwright.chromium.launch(**launch_kwargs)
         except Exception as e:
             logger.error(f"Failed to launch browser: {e}")
-            logger.info("Retrying installation...")
-            await self._ensure_browser_installed(force=True)
-            self.browser = await self.playwright.chromium.launch(headless=headless, args=["--start-maximized"])
+            if not self._ha_addon:
+                logger.info("Retrying after forced browser installation...")
+                await self._ensure_browser_installed(force=True)
+                self.browser = await self.playwright.chromium.launch(**launch_kwargs)
+            else:
+                raise
         
         # Load session if exists
         state = self.storage_state_path if os.path.exists(self.storage_state_path) else None

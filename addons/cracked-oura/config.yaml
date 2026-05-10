@@ -1,0 +1,31 @@
+name: "Cracked Oura"
+version: "0.1.0"
+slug: "cracked-oura"
+description: "Local Oura ring data dashboard — no subscription required"
+url: "https://github.com/EIrno/Cracked-Oura"
+arch:
+  - amd64
+  - aarch64
+ingress: true
+ingress_port: 8000
+panel_icon: "mdi:ring"
+startup: "services"
+boot: "auto"
+init: false
+ports:
+  "8000/tcp": null
+options:
+  port: 8000
+  log_level: "info"
+  llm_host: "http://localhost:11434"
+  llm_model: "llama3.1:latest"
+  telegram_bot_token: ""
+  telegram_chat_id: ""
+schema:
+  port: "int(1,65535)"
+  log_level: "list(error|warn|info|debug)"
+  llm_host: "str"
+  llm_model: "str"
+  telegram_bot_token: "str?"
+  telegram_chat_id: "str?"
+image: "ghcr.io/eirno/{arch}-addon-cracked-oura"

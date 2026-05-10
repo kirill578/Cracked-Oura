@@ -13,6 +13,7 @@
     "build:backend": "cd ../backend && ./venv/bin/python -m PyInstaller --noconfirm build.spec && cd ../frontend",
     "build": "node -e \"require('fs').rmSync('dist', {recursive: true, force: true})\" && npm run build:backend && tsc -b && vite build && tsc -p electron/tsconfig.json && echo '{\"type\":\"commonjs\"}' > dist-electron/package.json && electron-builder",
     "lint": "eslint .",
+    "build:web": "node -e \"require('fs').rmSync('dist', {recursive: true, force: true})\" && vite build",
     "preview": "vite preview"
   },
   "build": {
