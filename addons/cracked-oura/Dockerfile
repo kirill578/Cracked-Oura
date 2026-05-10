@@ -7,7 +7,7 @@ WORKDIR /app/frontend
 
 # Install dependencies first for better layer caching
 COPY frontend/package*.json ./
-RUN npm ci --prefer-offline
+RUN npm ci --prefer-offline --legacy-peer-deps
 
 COPY frontend/ ./
 RUN npm run build:web
