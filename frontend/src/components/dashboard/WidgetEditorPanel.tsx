@@ -19,7 +19,7 @@ interface WidgetEditorPanelProps {
 
 export function WidgetEditorPanel({ onClose, onSave, onChange, widget }: WidgetEditorPanelProps) {
     const [title, setTitle] = useState("");
-    const [type, setType] = useState<"score" | "trend" | "metric" | "bar" | "radar" | "json" | "table">("score");
+    const [type, setType] = useState<"score" | "trend" | "metric" | "bar" | "radar" | "pie" | "json" | "table">("score");
     const [dataKey, setDataKey] = useState("");
     const [dataKeys, setDataKeys] = useState<string[]>([]);
     const [color, setColor] = useState("#8AB4F8");
@@ -137,7 +137,7 @@ export function WidgetEditorPanel({ onClose, onSave, onChange, widget }: WidgetE
                     <Label htmlFor="type">Widget Type</Label>
                     <Select
                         value={type}
-                        onValueChange={(v: "score" | "trend" | "metric" | "bar" | "radar" | "json" | "table") => {
+                        onValueChange={(v: "score" | "trend" | "metric" | "bar" | "radar" | "pie" | "json" | "table") => {
                             setType(v);
                             // Find the first valid data source for this new type
                             const validOptions = DATA_OPTIONS.filter(opt => opt.types.includes(v));
@@ -163,6 +163,7 @@ export function WidgetEditorPanel({ onClose, onSave, onChange, widget }: WidgetE
                             <SelectItem value="metric">Metric Number</SelectItem>
                             <SelectItem value="bar">Bar Chart</SelectItem>
                             <SelectItem value="radar">Radar Chart</SelectItem>
+                            <SelectItem value="pie">Pie Chart</SelectItem>
                             <SelectItem value="table">Table</SelectItem>
                             <SelectItem value="json">JSON Viewer</SelectItem>
                         </SelectContent>
@@ -176,7 +177,7 @@ export function WidgetEditorPanel({ onClose, onSave, onChange, widget }: WidgetE
                     <Label>Data Source</Label>
                     <div className="space-y-2">
                         {/* Show selected keys for multi-select */}
-                        {(type === 'table' || type === 'trend' || type === 'bar' || type === 'radar') && (
+                        {(type === 'table' || type === 'trend' || type === 'bar' || type === 'radar' || type === 'pie') && (
                             <div className="flex flex-wrap gap-1 mb-2">
                                 {dataKeys.map(key => (
                                     <div key={key} className="bg-secondary text-secondary-foreground px-2 py-1 rounded-md text-xs flex items-center gap-1">
@@ -216,9 +217,9 @@ export function WidgetEditorPanel({ onClose, onSave, onChange, widget }: WidgetE
                         <DataFieldSelector
                             selectedPath={dataKey}
                             selectedPaths={dataKeys}
-                            multiSelect={type === 'table' || type === 'trend' || type === 'bar' || type === 'radar'}
+                            multiSelect={type === 'table' || type === 'trend' || type === 'bar' || type === 'radar' || type === 'pie'}
                             onSelect={(path) => {
-                                if (type === 'table' || type === 'trend' || type === 'bar' || type === 'radar') {
+                                if (type === 'table' || type === 'trend' || type === 'bar' || type === 'radar' || type === 'pie') {
                                     // Multi-select logic
                                     let newKeys = [...dataKeys];
                                     if (newKeys.includes(path)) {
@@ -261,7 +262,7 @@ export function WidgetEditorPanel({ onClose, onSave, onChange, widget }: WidgetE
                             }}
                             isSelectable={(field) => {
                                 // 1. Check for incompatible field names (timestamp, etc.)
-                                if (type === 'trend' || type === 'bar' || type === 'radar') {
+                                if (type === 'trend' || type === 'bar' || type === 'radar' || type === 'pie') {
                                     const lower = field.toLowerCase();
                                     if (lower.endsWith('_time') ||
                                         lower.endsWith('_date') ||

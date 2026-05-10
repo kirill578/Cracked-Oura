@@ -1,8 +1,10 @@
 import { ScoreGaugeCanvas } from './widgets/ScoreGaugeCanvas';
 import { SmartTrendWidgetCanvas } from './widgets/SmartTrendWidgetCanvas';
 import { MetricWidget } from './widgets/MetricWidget';
+import { OffsetMetricWidget } from './widgets/OffsetMetricWidget';
 import { BarChartCanvas } from './widgets/BarChartCanvas';
 import { RadarChartCanvas } from './widgets/RadarChartCanvas';
+import { PieChartCanvas, type PieSlice } from './widgets/PieChartCanvas';
 import { JSONWidget } from './widgets/JSONWidget';
 import type { WidgetInstance } from '@/types';
 import { formatFieldValue, getFieldLabel, getFieldMeta } from '@/lib/fieldLabels';
@@ -71,6 +73,22 @@ export const WidgetRegistry = ({ widget, data, date, onUpdate }: WidgetRegistryP
                 />
             );
         case 'metric': {
+            // If the widget asks for a different day (e.g. "yesterday"), fetch
+            // that day's data independently rather than using the dashboard's
+            // selected-date payload.
+            const dateOffset = widget.config.dateOffset as number | undefined;
+            if (dateOffset && date) {
+                return (
+                    <OffsetMetricWidget
+                        date={date}
+                        dateOffset={dateOffset}
+                        dataKey={widget.config.dataKey || ''}
+                        color={widget.config.color}
+                        unit={widget.config.unit}
+                    />
+                );
+            }
+
             const rawValue = resolveData(widget.config.dataKey || '');
             const meta = getFieldMeta(widget.config.dataKey);
             const formatted = formatFieldValue(widget.config.dataKey, rawValue);
@@ -117,6 +135,63 @@ export const WidgetRegistry = ({ widget, data, date, onUpdate }: WidgetRegistryP
                     chartType="table"
                 />
             );
+        case 'pie': {
+            // Build slices from each dataKey in dataKeys (or fall back to a single dataKey).
+            const keys = widget.config.dataKeys && widget.config.dataKeys.length > 0
+                ? widget.config.dataKeys
+                : (widget.config.dataKey ? [widget.config.dataKey] : []);
+
+            const palette = (widget.config.colors as string[] | undefined) || [
+                '#6366f1', '#a78bfa', '#60a5fa', '#fbbf24',
+                '#34d399', '#f87171', '#22d3ee'
+            ];
+
+            const slices: PieSlice[] = keys
+                .map((key, i) => {
+                    const raw = resolveData(key);
+                    const value = typeof raw === 'number' ? raw : Number(raw);
+                    if (!Number.isFinite(value)) return null;
+                    const meta = getFieldMeta(key);
+                    return {
+                        label: meta.short ?? meta.label ?? key,
+                        value,
+                        formattedValue: formatFieldValue(key, value),
+                        color: palette[i % palette.length],
+                    } as PieSlice;
+                })
+                .filter((s): s is PieSlice => s !== null);
+
+            // Use the first valid key's formatter for the total so the unit matches the slices.
+            const firstNumericKey = keys.find((k) => {
+                const raw = resolveData(k);
+                return typeof raw === 'number' && Number.isFinite(raw);
+            });
+
+            // The center label can either be the sum of all slices (default)
+            // or a dedicated metric resolved from `totalDataKey` — e.g. for the
+            // sleep-stages pie we still show Awake as a slice but the centre
+            // displays Total sleep (which excludes Awake).
+            const totalDataKey = widget.config.totalDataKey as string | undefined;
+            const totalRaw = totalDataKey ? resolveData(totalDataKey) : undefined;
+            const totalFromKey = typeof totalRaw === 'number' && Number.isFinite(totalRaw)
+                ? totalRaw
+                : null;
+
+            const sliceSum = slices.reduce((acc, s) => acc + s.value, 0);
+            const centerValue = totalFromKey !== null ? totalFromKey : sliceSum;
+            const centerFormatKey = totalDataKey ?? firstNumericKey;
+            const totalLabel = centerFormatKey
+                ? formatFieldValue(centerFormatKey, centerValue)
+                : centerValue.toLocaleString();
+
+            return (
+                <PieChartCanvas
+                    slices={slices}
+                    totalLabel={totalLabel}
+                    totalCaption={widget.config.totalCaption || 'Total'}
+                />
+            );
+        }
         case 'radar':
             let radarData = resolveData(widget.config.dataKey || '') || [];
 
