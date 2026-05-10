@@ -36,6 +36,23 @@ export interface SettingsResponse {
     telegram_chat_id: string;
 }
 
+export interface TelegramDiscoverChatRow {
+    chat_id: string;
+    title: string;
+    chat_type: string;
+    last_message_preview: string;
+}
+
+export interface TelegramDiscoverResponse {
+    bot: {
+        first_name: string;
+        username: string | null;
+        open_link: string | null;
+    };
+    chats: TelegramDiscoverChatRow[];
+    hint?: string;
+}
+
 export interface SettingsUpdate {
     email?: string;
     schedule_cadence?: ScheduleCadence;
@@ -175,6 +192,30 @@ export const api = {
         const res = await fetch(`${BASE_URL}/api/notifications/test`, { method: 'POST' });
         const data = await res.json();
         if (!res.ok) throw new Error(data.detail || 'Failed to send notification');
+        return data;
+    },
+
+    discoverTelegramChats: async (
+        telegram_bot_token?: string
+    ): Promise<TelegramDiscoverResponse> => {
+        const res = await fetch(`${BASE_URL}/api/notifications/telegram/discover`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(
+                telegram_bot_token ? { telegram_bot_token } : {}
+            ),
+        });
+        const data = await res.json();
+        if (!res.ok) {
+            const d = data.detail;
+            const msg =
+                typeof d === 'string'
+                    ? d
+                    : Array.isArray(d)
+                      ? d.map((x: { msg?: string }) => x.msg).join(', ')
+                      : 'Discover failed';
+            throw new Error(msg);
+        }
         return data;
     },
 

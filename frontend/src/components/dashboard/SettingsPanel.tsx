@@ -3,10 +3,10 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { X, Loader2, AlertCircle, Download, Copy, Upload, Send } from "lucide-react";
+import { X, Loader2, AlertCircle, Download, Copy, Upload, Send, MessageSquare } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { cn } from "@/lib/utils";
-import { api, type AutomationStatusResponse, type ScheduleCadence } from '@/lib/api';
+import { api, type AutomationStatusResponse, type ScheduleCadence, type TelegramDiscoverChatRow } from '@/lib/api';
 
 interface SettingsPanelProps {
     onClose: () => void;
@@ -66,6 +66,14 @@ export function SettingsPanel({ onClose }: SettingsPanelProps) {
     const [telegramTokenMasked, setTelegramTokenMasked] = useState('');
     const [telegramChatId, setTelegramChatId] = useState('');
     const [telegramTesting, setTelegramTesting] = useState(false);
+    const [telegramDiscovering, setTelegramDiscovering] = useState(false);
+    const [telegramDiscoverBot, setTelegramDiscoverBot] = useState<{
+        first_name: string;
+        username: string | null;
+        open_link: string | null;
+    } | null>(null);
+    const [telegramDiscoverChats, setTelegramDiscoverChats] = useState<TelegramDiscoverChatRow[]>([]);
+    const [telegramDiscoverHint, setTelegramDiscoverHint] = useState<string | null>(null);
 
     useEffect(() => {
         api.getSettings()
@@ -91,6 +99,12 @@ export function SettingsPanel({ onClose }: SettingsPanelProps) {
             })
             .catch(err => console.error("Failed to fetch settings", err));
     }, []);
+
+    useEffect(() => {
+        setTelegramDiscoverBot(null);
+        setTelegramDiscoverChats([]);
+        setTelegramDiscoverHint(null);
+    }, [telegramToken]);
 
     const addLog = (msg: string) => setLogs(prev => [...prev, `[${new Date().toLocaleTimeString()}] ${msg}`]);
 
@@ -136,6 +150,30 @@ export function SettingsPanel({ onClose }: SettingsPanelProps) {
             addLog(`Telegram test failed: ${err.message}`);
         } finally {
             setTelegramTesting(false);
+        }
+    };
+
+    const handleDiscoverTelegramChats = async () => {
+        setTelegramDiscovering(true);
+        setError(null);
+        setTelegramDiscoverHint(null);
+        try {
+            const tokenArg = telegramToken.trim() || undefined;
+            const data = await api.discoverTelegramChats(tokenArg);
+            setTelegramDiscoverBot(data.bot);
+            setTelegramDiscoverChats(data.chats);
+            setTelegramDiscoverHint(data.hint ?? null);
+            const n = data.chats.length;
+            addLog(
+                n > 0
+                    ? `Telegram: found ${n} chat(s); pick one below or save its ID.`
+                    : 'Telegram: no chats in recent updates yet — send a message to your bot and try again.'
+            );
+        } catch (err: any) {
+            setError(err.message);
+            addLog(`Telegram discover failed: ${err.message}`);
+        } finally {
+            setTelegramDiscovering(false);
         }
     };
 
@@ -634,6 +672,100 @@ Scores
                                 </p>
                             </div>
 
+                            <div className="rounded-md border border-border bg-secondary/20 p-3 space-y-3">
+                                <div className="flex items-start gap-2">
+                                    <MessageSquare className="h-4 w-4 mt-0.5 shrink-0 text-muted-foreground" />
+                                    <div className="space-y-2 min-w-0">
+                                        <p className="text-xs font-medium text-foreground">
+                                            Find your chat (no ID needed)
+                                        </p>
+                                        <ol className="text-[11px] text-muted-foreground list-decimal pl-4 space-y-1">
+                                            <li>
+                                                Save your token below, or leave it in the field above — it is sent only to your server for this lookup.
+                                            </li>
+                                            <li>
+                                                Open your bot in Telegram and send any message (for example &quot;hello&quot;).
+                                            </li>
+                                            <li>
+                                                Click <span className="text-foreground/90">Find my chat</span>, then choose the row that matches your message.
+                                            </li>
+                                        </ol>
+                                        {telegramDiscoverBot?.open_link && (
+                                            <p className="text-[11px]">
+                                                <a
+                                                    href={telegramDiscoverBot.open_link}
+                                                    target="_blank"
+                                                    rel="noreferrer"
+                                                    className="underline font-medium text-foreground"
+                                                >
+                                                    Open {telegramDiscoverBot.first_name}
+                                                    {telegramDiscoverBot.username
+                                                        ? ` (@${telegramDiscoverBot.username})`
+                                                        : ''}{' '}
+                                                    in Telegram
+                                                </a>
+                                            </p>
+                                        )}
+                                    </div>
+                                </div>
+                                <Button
+                                    type="button"
+                                    variant="secondary"
+                                    className="w-full"
+                                    onClick={handleDiscoverTelegramChats}
+                                    disabled={
+                                        telegramDiscovering || (!telegramToken.trim() && !telegramTokenSet)
+                                    }
+                                >
+                                    {telegramDiscovering ? (
+                                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                    ) : (
+                                        <MessageSquare className="mr-2 h-4 w-4" />
+                                    )}
+                                    Find my chat
+                                </Button>
+                                {telegramDiscoverHint && (
+                                    <p className="text-[11px] text-muted-foreground">{telegramDiscoverHint}</p>
+                                )}
+                                {telegramDiscoverChats.length > 0 && (
+                                    <div className="space-y-2">
+                                        <p className="text-[10px] uppercase tracking-wide text-muted-foreground">
+                                            Tap a chat to fill Chat ID
+                                        </p>
+                                        <ul className="space-y-1.5 max-h-40 overflow-y-auto">
+                                            {telegramDiscoverChats.map(row => (
+                                                <li key={row.chat_id}>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => {
+                                                            setTelegramChatId(row.chat_id);
+                                                            addLog(`Chat ID set from: ${row.title}`);
+                                                        }}
+                                                        className={cn(
+                                                            'w-full text-left rounded-md border border-border px-2.5 py-2 text-[11px]',
+                                                            'bg-background/80 hover:bg-accent/60 transition-colors',
+                                                            telegramChatId === row.chat_id &&
+                                                                'ring-1 ring-primary border-primary/50'
+                                                        )}
+                                                    >
+                                                        <div className="font-medium text-foreground truncate">
+                                                            {row.title}
+                                                        </div>
+                                                        <div className="text-muted-foreground truncate mt-0.5">
+                                                            {row.last_message_preview}
+                                                        </div>
+                                                        <div className="font-mono text-[10px] text-muted-foreground/80 mt-1">
+                                                            {row.chat_id}
+                                                            {row.chat_type ? ` · ${row.chat_type}` : ''}
+                                                        </div>
+                                                    </button>
+                                                </li>
+                                            ))}
+                                        </ul>
+                                    </div>
+                                )}
+                            </div>
+
                             <div className="space-y-2">
                                 <Label>Chat ID</Label>
                                 <Input
@@ -642,7 +774,8 @@ Scores
                                     onChange={e => setTelegramChatId(e.target.value)}
                                 />
                                 <p className="text-[11px] text-muted-foreground">
-                                    Forward a message from your bot to{' '}
+                                    Optional if you used Find my chat above.
+                                    Otherwise forward a message to{' '}
                                     <a
                                         href="https://t.me/userinfobot"
                                         target="_blank"
@@ -651,7 +784,7 @@ Scores
                                     >
                                         @userinfobot
                                     </a>{' '}
-                                    to find your numeric ID.
+                                    to read your numeric ID.
                                 </p>
                             </div>
 

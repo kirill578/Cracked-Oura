@@ -364,6 +364,29 @@ async def test_notification(db: Session = Depends(get_db)):
         raise HTTPException(status_code=400, detail=result.get("error", "Failed to send"))
     return {"message": "Notification sent successfully"}
 
+@router.post("/api/notifications/telegram/discover")
+async def telegram_discover_chats(request: TelegramDiscoverRequest):
+    """Resolve the bot (for deep-linking) and list chats from recent ``getUpdates``."""
+    from ..notifications import telegram_discover_chats as discover
+
+    token = (request.telegram_bot_token or "").strip()
+    if not token:
+        token = (config_manager.get_config().get("telegram_bot_token") or "").strip()
+    if not token:
+        raise HTTPException(
+            status_code=400,
+            detail="Enter and save a bot token first, or paste it in the token field for this request.",
+        )
+
+    result = await discover(token)
+    if not result.get("ok"):
+        raise HTTPException(status_code=400, detail=result.get("error", "Discover failed"))
+    return {
+        "bot": result["bot"],
+        "chats": result.get("chats", []),
+        "hint": result.get("hint"),
+    }
+
 # -----------------------------------------------------------------------------
 # Dashboard Configuration Endpoints
 # -----------------------------------------------------------------------------
