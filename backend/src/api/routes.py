@@ -62,6 +62,11 @@ class SettingsRequest(BaseModel):
     telegram_bot_token: Optional[str] = None
     telegram_chat_id: Optional[str] = None
 
+class TelegramDiscoverRequest(BaseModel):
+    """Optional token from the settings form; if omitted, uses the saved config token."""
+
+    telegram_bot_token: Optional[str] = None
+
 class Dashboard(BaseModel):
     id: str
     name: str

@@ -19,7 +19,7 @@ available day from the local DB and sends a compact summary message:
 """
 
 import logging
-from typing import Optional
+from typing import Any, Dict, List, Optional
 from datetime import date
 
 import httpx
@@ -31,6 +31,8 @@ from .models import Sleep, Activity, Readiness, SleepSession
 logger = logging.getLogger("Notifications")
 
 _TELEGRAM_URL = "https://api.telegram.org/bot{token}/sendMessage"
+_TELEGRAM_GET_ME = "https://api.telegram.org/bot{token}/getMe"
+_TELEGRAM_GET_UPDATES = "https://api.telegram.org/bot{token}/getUpdates"
 
 
 # ---------------------------------------------------------------------------
@@ -125,6 +127,137 @@ def build_summary(db: Session) -> Optional[str]:
         f"  ⚪ Light   {_fmt_dur(light)}",
     ]
     return "\n".join(lines)
+
+
+# ---------------------------------------------------------------------------
+# Chat discovery (getUpdates)
+# ---------------------------------------------------------------------------
+
+def _telegram_chat_title(chat: Dict[str, Any]) -> str:
+    ctype = chat.get("type") or ""
+    if ctype == "private":
+        parts = [chat.get("first_name") or "", chat.get("last_name") or ""]
+        name = " ".join(p for p in parts if p).strip()
+        un = chat.get("username")
+        if name and un:
+            return f"{name} (@{un})"
+        if un:
+            return f"@{un}"
+        return name or "Private chat"
+    return chat.get("title") or chat.get("username") or "Chat"
+
+
+def _message_preview(message: Dict[str, Any]) -> str:
+    text = message.get("text") or message.get("caption")
+    if text:
+        t = text.strip().replace("\n", " ")
+        return t if len(t) <= 160 else t[:157] + "…"
+    if message.get("sticker"):
+        return "[sticker]"
+    if message.get("photo"):
+        return "[photo]"
+    if message.get("document"):
+        return "[document]"
+    if message.get("voice"):
+        return "[voice]"
+    if message.get("video"):
+        return "[video]"
+    if message.get("poll"):
+        return "[poll]"
+    return "[message]"
+
+
+def _message_from_update(update: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    for key in ("message", "edited_message", "channel_post", "edited_channel_post"):
+        if key in update:
+            return update[key]
+    return None
+
+
+async def telegram_discover_chats(bot_token: str) -> dict:
+    """Call Telegram ``getMe`` and ``getUpdates`` to list chats the bot recently heard from.
+
+    Returns ``{"ok": True, "bot": {...}, "chats": [...]}`` or ``{"ok": False, "error": "..."}``.
+    """
+    token = bot_token.strip()
+    if not token:
+        return {"ok": False, "error": "Bot token is required"}
+
+    try:
+        async with httpx.AsyncClient(timeout=20.0) as client:
+            me_resp = await client.get(_TELEGRAM_GET_ME.format(token=token))
+            me_data = me_resp.json()
+            if not me_data.get("ok"):
+                return {"ok": False, "error": me_data.get("description", "Invalid bot token")}
+
+            bot = me_data.get("result") or {}
+            username = bot.get("username")
+            bot_info = {
+                "first_name": bot.get("first_name") or "Bot",
+                "username": username,
+                "open_link": f"https://t.me/{username}" if username else None,
+            }
+
+            up_resp = await client.get(
+                _TELEGRAM_GET_UPDATES.format(token=token),
+                params={"limit": 100, "timeout": 0},
+            )
+            up_data = up_resp.json()
+            if not up_data.get("ok"):
+                err = up_data.get("description", "getUpdates failed")
+                # Webhook active → long-polling disabled
+                if up_resp.status_code == 409 or "webhook" in err.lower():
+                    return {
+                        "ok": False,
+                        "error": (
+                            "This bot has a webhook configured, so pending messages cannot be "
+                            "listed here. Remove the webhook in BotFather or enter the chat ID manually."
+                        ),
+                    }
+                return {"ok": False, "error": err}
+
+            # Latest message per chat (by highest update_id)
+            by_chat: Dict[str, Dict[str, Any]] = {}
+            for update in up_data.get("result") or []:
+                uid = update.get("update_id")
+                if uid is None:
+                    continue
+                msg = _message_from_update(update)
+                if not msg:
+                    continue
+                chat = msg.get("chat") or {}
+                cid = chat.get("id")
+                if cid is None:
+                    continue
+                cid_str = str(cid)
+                prev = by_chat.get(cid_str)
+                if prev is None or int(uid) > int(prev["update_id"]):
+                    by_chat[cid_str] = {
+                        "update_id": uid,
+                        "chat_id": cid_str,
+                        "title": _telegram_chat_title(chat),
+                        "chat_type": chat.get("type") or "",
+                        "last_message_preview": _message_preview(msg),
+                    }
+
+            chats: List[Dict[str, Any]] = sorted(
+                by_chat.values(),
+                key=lambda row: int(row["update_id"]),
+                reverse=True,
+            )
+            for row in chats:
+                row.pop("update_id", None)
+
+            out = {"ok": True, "bot": bot_info, "chats": chats}
+            if not chats:
+                out["hint"] = (
+                    "No messages received yet. Open your bot in Telegram, send any message "
+                    "(e.g. “hello”), then click again."
+                )
+            return out
+    except Exception as exc:
+        logger.error(f"Telegram discover failed: {exc}")
+        return {"ok": False, "error": str(exc)}
 
 
 # ---------------------------------------------------------------------------

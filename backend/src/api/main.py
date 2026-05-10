@@ -4,8 +4,10 @@ from backend.src.api.routes import router
 from backend.src.database import init_db
 
 import asyncio
+import glob
 import logging
 import random
+import tempfile
 from datetime import datetime, timedelta, timezone
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 from backend.src.automation import automator
@@ -46,10 +48,31 @@ else:
     logger = logging.getLogger("API")
     logger.info(f"API Starting... Logging to {log_file}")
 
+def _purge_stale_zips() -> None:
+    """Removes any *.zip files left in the user data directory from previous runs.
+
+    Old code wrote zips there permanently; this one-time sweep at startup
+    reclaims that disk space. Safe to call on every boot — zips should never
+    live in the user data dir once ingestion is complete.
+    """
+    data_dir = str(get_user_data_dir())
+    pattern = os.path.join(data_dir, "*.zip")
+    for path in glob.glob(pattern):
+        try:
+            os.remove(path)
+            logger.info(f"Purged stale export zip: {path}")
+        except Exception as exc:
+            logger.warning(f"Could not remove stale zip {path}: {exc}")
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Startup
     init_db()
+
+    # Remove any zip files left behind by previous versions that wrote directly
+    # to the user data directory instead of a temp directory.
+    _purge_stale_zips()
 
     # First-run convenience: if the DB is empty and a bundled CSV folder
     # exists at <repo>/data/App Data, ingest it automatically so the user
@@ -303,40 +326,37 @@ async def test_login():
 async def run_download_existing_task():
     """
     Standalone task for downloading existing export.
+    The zip is written to a temporary directory that is auto-deleted on exit.
     """
     logger.info("Starting download existing task...")
     try:
         cfg = config_manager.get_config()
-        # Ensure automator is initialized and configured
         if not automator._is_initialized:
             await automator.initialize(headless=cfg.get("headless", True))
-        
-        automator.email = cfg.get("email", "")
-        
-        # Use user data dir for downloads
-        from backend.src.paths import get_user_data_dir
-        save_dir = str(get_user_data_dir())
-        
-        result = await automator.download_existing_export(save_dir=save_dir)
-        
-        if isinstance(result, dict) and result.get("status") == "otp_required":
-            config_manager.update_status("Waiting for OTP...")
-            return
 
-        file_path = result
-        
-        if file_path:
-            logger.info(f"Export downloaded to {file_path}. Starting ingestion...")
-            await process_ingestion(file_path)
-        else:
-            logger.info("No existing export found.")
-        
-        # Cleanup on success (if not waiting for OTP)
+        automator.email = cfg.get("email", "")
+
+        with tempfile.TemporaryDirectory() as save_dir:
+            result = await automator.download_existing_export(save_dir=save_dir)
+
+            if isinstance(result, dict) and result.get("status") == "otp_required":
+                config_manager.update_status("Waiting for OTP...")
+                return
+
+            file_path = result
+
+            if file_path:
+                logger.info(f"Export downloaded to {file_path}. Starting ingestion...")
+                await process_ingestion(file_path)
+            else:
+                logger.info("No existing export found.")
+        # Temp dir (and the zip inside it) is automatically removed here.
+
         await automator.cleanup()
 
     except Exception as e:
         logger.error(f"Download task failed: {e}")
-        await automator.cleanup() # Cleanup on error
+        await automator.cleanup()
 
 
 @app.post("/api/automation/download-latest")
@@ -377,31 +397,29 @@ async def run_ingestion_task(force=False):
         
         # 2. Run Full Automation (Request -> Wait -> Download)
         config_manager.update_status("Running Automation...")
-        
-        # Use user data dir for downloads
-        from backend.src.paths import get_user_data_dir
-        save_dir = str(get_user_data_dir())
 
-        # This function handles login, requesting, waiting, and downloading
-        result = await automator.request_new_export_and_download(save_dir=save_dir)
-        
-        if isinstance(result, dict) and result.get("status") == "otp_required":
-             config_manager.update_status("Waiting for OTP...")
-             return
+        with tempfile.TemporaryDirectory() as save_dir:
+            # This function handles login, requesting, waiting, and downloading.
+            # The zip lands in the temp dir and is auto-deleted when the block exits.
+            result = await automator.request_new_export_and_download(save_dir=save_dir)
 
-        file_path = result
-        
-        if file_path:
-            logger.info(f"Background worker status: Downloaded to {file_path}")
-            config_manager.update_status("Downloading...")
-            
-            # 3. Ingest
-            await process_ingestion(file_path)
-        else:
-            logger.info("Background worker: No file downloaded (Timeout or Error).")
-            config_manager.update_status("Failed to download export.")
-        
-        # Cleanup on success
+            if isinstance(result, dict) and result.get("status") == "otp_required":
+                config_manager.update_status("Waiting for OTP...")
+                return
+
+            file_path = result
+
+            if file_path:
+                logger.info(f"Background worker status: Downloaded to {file_path}")
+                config_manager.update_status("Downloading...")
+
+                # 3. Ingest (while the temp dir — and the zip — still exist)
+                await process_ingestion(file_path)
+            else:
+                logger.info("Background worker: No file downloaded (Timeout or Error).")
+                config_manager.update_status("Failed to download export.")
+        # Temp dir removed here.
+
         await automator.cleanup()
 
     except Exception as e:
@@ -410,16 +428,15 @@ async def run_ingestion_task(force=False):
         await automator.cleanup() # Cleanup on error
 
 async def process_ingestion(zip_path):
-    logger.info(f"Background worker: Downloaded to {zip_path}")
-    
-    # Ingest
+    logger.info(f"Background worker: Ingesting {zip_path}")
+
     config_manager.update_status("Ingesting...")
     db = SessionLocal()
     try:
         parser = OuraParser(db)
         parser.parse_zip(zip_path)
         logger.info("Background worker: Ingestion successful.")
-        
+
         # Success! Persist last_run as UTC ISO; the UI converts to browser tz.
         now_iso = datetime.now(timezone.utc).isoformat()
         config_manager.update_status("Idle", last_run=now_iso)
@@ -442,6 +459,15 @@ async def process_ingestion(zip_path):
         config_manager.update_status(f"Ingestion Failed: {str(e)}")
     finally:
         db.close()
+        # Belt-and-suspenders: delete the zip if it still exists on disk
+        # (callers using TemporaryDirectory already handle this via context exit,
+        # but manual-upload and other paths benefit from explicit removal).
+        try:
+            if zip_path and os.path.isfile(zip_path):
+                os.remove(zip_path)
+                logger.info(f"Deleted zip after ingestion: {zip_path}")
+        except Exception as del_err:
+            logger.warning(f"Could not delete zip {zip_path}: {del_err}")
 
 
 def _resolve_tz(name: str | None) -> ZoneInfo:

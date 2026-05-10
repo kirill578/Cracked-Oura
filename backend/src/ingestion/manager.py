@@ -14,6 +14,146 @@ from .processors.common import CommonProcessor
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("OuraParser")
 
+# ---------------------------------------------------------------------------
+# Zip safety limits
+# ---------------------------------------------------------------------------
+# Oura's full data export for several years of use is typically 5–30 MB
+# compressed, 20–150 MB uncompressed (mostly CSV text).  The limits below
+# are generous multiples of those figures so legitimate exports never trip
+# them, while zip-bombs and unexpected bulk content are rejected early.
+
+_MAX_ZIP_BYTES       = 500  * 1024 * 1024   # 500 MB on-disk zip
+_MAX_TOTAL_BYTES     = 2048 * 1024 * 1024   # 2 GB total uncompressed
+_MAX_SINGLE_BYTES    = 512  * 1024 * 1024   # 512 MB per member
+_MAX_FILE_COUNT      = 2000                  # max number of members
+_MAX_RATIO           = 100                   # compression-ratio red flag
+_MIN_RATIO_SIZE      = 1 * 1024 * 1024      # only flag if member > 1 MB
+_CHUNK              = 64 * 1024             # read chunk size during extract
+
+
+def _safe_extract(zip_path: str, dest_dir: str) -> None:
+    """Extract a zip archive defensively.
+
+    Protections applied:
+    - On-disk zip size cap (reject before opening).
+    - Member count cap (reject if > _MAX_FILE_COUNT entries).
+    - Per-member declared size cap (from central-directory metadata).
+    - Total declared size cap.
+    - Compression-ratio check against zip-bomb heuristic.
+    - Path-traversal sanitisation — no ``../`` or absolute paths reach disk.
+    - Byte-counted chunked extraction — actual bytes written are bounded even
+      if the central-directory metadata was falsified.
+    """
+    # 1. Reject oversized zip before we even open it.
+    try:
+        zip_size = os.path.getsize(zip_path)
+    except OSError as exc:
+        raise ValueError(f"Cannot stat zip file: {exc}") from exc
+
+    if zip_size > _MAX_ZIP_BYTES:
+        raise ValueError(
+            f"ZIP file is too large: {zip_size / 1e6:.1f} MB "
+            f"(limit {_MAX_ZIP_BYTES / 1e6:.0f} MB)"
+        )
+
+    try:
+        zf_handle = zipfile.ZipFile(zip_path, "r")
+    except zipfile.BadZipFile as exc:
+        raise ValueError(f"Not a valid ZIP file: {exc}") from exc
+
+    with zf_handle as zf:
+        members = zf.infolist()
+
+        # 2. Member count.
+        if len(members) > _MAX_FILE_COUNT:
+            raise ValueError(
+                f"ZIP contains {len(members)} entries (limit {_MAX_FILE_COUNT})"
+            )
+
+        # 3. Declared-size pre-flight (fast path — reads only metadata).
+        total_declared = 0
+        for m in members:
+            if m.is_dir():
+                continue
+            if m.file_size > _MAX_SINGLE_BYTES:
+                raise ValueError(
+                    f"ZIP entry {m.filename!r} declares {m.file_size / 1e6:.1f} MB "
+                    f"(limit {_MAX_SINGLE_BYTES / 1e6:.0f} MB per file)"
+                )
+            total_declared += m.file_size
+            if total_declared > _MAX_TOTAL_BYTES:
+                raise ValueError(
+                    f"ZIP total declared size exceeds {_MAX_TOTAL_BYTES / 1e6:.0f} MB"
+                )
+            # Compression-ratio heuristic — only meaningful for larger members.
+            if m.compress_size > 0 and m.file_size >= _MIN_RATIO_SIZE:
+                ratio = m.file_size / m.compress_size
+                if ratio > _MAX_RATIO:
+                    raise ValueError(
+                        f"Suspicious compression ratio ({ratio:.0f}×) for "
+                        f"{m.filename!r} — possible zip bomb"
+                    )
+
+        # 4. Extract member-by-member with path sanitisation and byte counting.
+        dest_real_base = os.path.realpath(dest_dir)
+        total_written = 0
+
+        for m in members:
+            if m.is_dir():
+                continue
+
+            # Normalise separators (Windows zips use backslashes).
+            raw_name = m.filename.replace("\\", "/")
+
+            # Reject any entry whose path contains traversal components or is
+            # absolute.  We skip rather than sanitise — legitimate Oura exports
+            # never need funny paths.
+            parts = raw_name.split("/")
+            if any(p == ".." for p in parts) or raw_name.startswith("/"):
+                logger.warning(
+                    f"Path-traversal component detected — skipping: {m.filename!r}"
+                )
+                continue
+
+            # Rebuild a clean relative path from non-empty, non-dot components.
+            clean_parts = [p for p in parts if p and p != "."]
+            if not clean_parts:
+                logger.warning(f"Skipping empty/root entry: {m.filename!r}")
+                continue
+
+            safe_rel = os.path.join(*clean_parts)
+            dest_path = os.path.join(dest_dir, safe_rel)
+
+            # Final containment check after os.path.realpath resolution.
+            dest_resolved = os.path.realpath(dest_path)
+            if not dest_resolved.startswith(dest_real_base + os.sep):
+                logger.warning(
+                    f"Containment check failed — skipping: {m.filename!r}"
+                )
+                continue
+
+            os.makedirs(os.path.dirname(dest_resolved), exist_ok=True)
+
+            # Chunked write with live byte counter (catches falsified metadata).
+            with zf.open(m) as src, open(dest_resolved, "wb") as dst:
+                while True:
+                    chunk = src.read(_CHUNK)
+                    if not chunk:
+                        break
+                    total_written += len(chunk)
+                    if total_written > _MAX_TOTAL_BYTES:
+                        raise ValueError(
+                            f"Extraction aborted: actual bytes written exceeded "
+                            f"{_MAX_TOTAL_BYTES / 1e6:.0f} MB limit"
+                        )
+                    dst.write(chunk)
+
+    logger.info(
+        f"Extracted {len(members)} members, "
+        f"{total_written / 1e6:.2f} MB uncompressed."
+    )
+
+
 class OuraParser(IngestionBase):
     def __init__(self, session: Session):
         super().__init__(session)
@@ -23,13 +163,15 @@ class OuraParser(IngestionBase):
         self.common_processor = CommonProcessor(session)
 
     def parse_zip(self, zip_path: str):
-        """Extracts ZIP and parses all contained CSVs, handling nested folders."""
+        """Extracts ZIP safely and parses all contained CSVs."""
         with tempfile.TemporaryDirectory() as temp_dir:
             try:
-                with zipfile.ZipFile(zip_path, 'r') as zip_ref:
-                    zip_ref.extractall(temp_dir)
-            except zipfile.BadZipFile:
-                logger.error(f"Error: Invalid ZIP file at {zip_path}")
+                _safe_extract(zip_path, temp_dir)
+            except (ValueError, zipfile.BadZipFile) as exc:
+                logger.error(f"ZIP rejected: {exc}")
+                return
+            except Exception as exc:
+                logger.error(f"Unexpected error extracting ZIP: {exc}")
                 return
             
             # Recursively search for a directory containing data files
