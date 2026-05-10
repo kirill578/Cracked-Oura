@@ -1,708 +1,1196 @@
 {
-    "dashboard": {
-        "dashboards": [
-            {
-                "id": "default",
-                "name": "Daily",
-                "widgets": [
-                    {
-                        "id": "score-sleep",
-                        "type": "score",
-                        "title": "Sleep score",
-                        "width": "col-span-4",
-                        "height": "h-40",
-                        "config": { "dataKey": "sleep.score", "color": "#8AB4F8" }
-                    },
-                    {
-                        "id": "score-readiness",
-                        "type": "score",
-                        "title": "Readiness score",
-                        "width": "col-span-4",
-                        "height": "h-40",
-                        "config": { "dataKey": "readiness.score", "color": "#4ade80" }
-                    },
-                    {
-                        "id": "score-activity",
-                        "type": "score",
-                        "title": "Activity score",
-                        "width": "col-span-4",
-                        "height": "h-40",
-                        "config": { "dataKey": "activity.score", "color": "#f87171" }
-                    },
-
-                    {
-                        "id": "radar-sleep",
-                        "type": "radar",
-                        "title": "Sleep contributors",
-                        "width": "col-span-4",
-                        "height": "h-40",
-                        "config": { "dataKey": "sleep.contributors", "color": "#8AB4F8" }
-                    },
-                    {
-                        "id": "radar-readiness",
-                        "type": "radar",
-                        "title": "Readiness contributors",
-                        "width": "col-span-4",
-                        "height": "h-40",
-                        "config": { "dataKey": "readiness.contributors", "color": "#4ade80" }
-                    },
-                    {
-                        "id": "radar-activity",
-                        "type": "radar",
-                        "title": "Activity contributors",
-                        "width": "col-span-4",
-                        "height": "h-40",
-                        "config": { "dataKey": "activity.contributors", "color": "#f87171" }
-                    },
-
-                    {
-                        "id": "pie-sleep-stages",
-                        "type": "pie",
-                        "title": "Sleep stages",
-                        "width": "col-span-6",
-                        "height": "h-40",
-                        "config": {
-                            "dataKey": "sleep_session.deep_sleep_duration",
-                            "color": "#6366f1",
-                            "totalCaption": "Total sleep",
-                            "totalDataKey": "sleep_session.total_sleep_duration",
-                            "dataKeys": [
-                                "sleep_session.deep_sleep_duration",
-                                "sleep_session.rem_sleep_duration",
-                                "sleep_session.light_sleep_duration",
-                                "sleep_session.awake_time"
-                            ],
-                            "colors": ["#6366f1", "#a78bfa", "#60a5fa", "#fbbf24"]
-                        }
-                    },
-                    {
-                        "id": "metric-yesterday-steps",
-                        "type": "metric",
-                        "title": "Yesterday's steps",
-                        "width": "col-span-3",
-                        "height": "h-40",
-                        "config": {
-                            "dataKey": "activity.steps",
-                            "color": "#f59e0b",
-                            "dateOffset": -1
-                        }
-                    },
-
-                    {
-                        "id": "metric-time-in-bed",
-                        "type": "metric",
-                        "title": "Time in bed",
-                        "width": "col-span-3",
-                        "height": "h-32",
-                        "config": { "dataKey": "sleep_session.time_in_bed", "color": "#8AB4F8" }
-                    },
-                    {
-                        "id": "metric-sleep-latency",
-                        "type": "metric",
-                        "title": "Sleep latency",
-                        "width": "col-span-3",
-                        "height": "h-32",
-                        "config": { "dataKey": "sleep_session.latency", "color": "#8AB4F8" }
-                    },
-                    {
-                        "id": "metric-sleep-efficiency",
-                        "type": "metric",
-                        "title": "Sleep efficiency",
-                        "width": "col-span-3",
-                        "height": "h-32",
-                        "config": { "dataKey": "sleep_session.efficiency", "color": "#8AB4F8" }
-                    },
-                    {
-                        "id": "metric-awake-time",
-                        "type": "metric",
-                        "title": "Awake time",
-                        "width": "col-span-3",
-                        "height": "h-32",
-                        "config": { "dataKey": "sleep_session.awake_time", "color": "#8AB4F8" }
-                    },
-
-                    {
-                        "id": "metric-avg-hr",
-                        "type": "metric",
-                        "title": "Average heart rate",
-                        "width": "col-span-3",
-                        "height": "h-32",
-                        "config": { "dataKey": "sleep_session.average_heart_rate", "color": "#f87171" }
-                    },
-                    {
-                        "id": "metric-low-hr",
-                        "type": "metric",
-                        "title": "Lowest heart rate",
-                        "width": "col-span-3",
-                        "height": "h-32",
-                        "config": { "dataKey": "sleep_session.lowest_heart_rate", "color": "#f87171" }
-                    },
-                    {
-                        "id": "metric-hrv",
-                        "type": "metric",
-                        "title": "Average HRV",
-                        "width": "col-span-3",
-                        "height": "h-32",
-                        "config": { "dataKey": "sleep_session.average_hrv", "color": "#fb923c" }
-                    },
-                    {
-                        "id": "metric-breath",
-                        "type": "metric",
-                        "title": "Average breath rate",
-                        "width": "col-span-3",
-                        "height": "h-32",
-                        "config": { "dataKey": "sleep_session.average_breath", "color": "#22d3ee" }
-                    },
-
-                    {
-                        "id": "metric-spo2",
-                        "type": "metric",
-                        "title": "Average SpO\u2082",
-                        "width": "col-span-3",
-                        "height": "h-32",
-                        "config": { "dataKey": "sleep.average_spo2", "color": "#34d399" }
-                    },
-                    {
-                        "id": "metric-bdi",
-                        "type": "metric",
-                        "title": "Breathing disturbance",
-                        "width": "col-span-3",
-                        "height": "h-32",
-                        "config": { "dataKey": "sleep.breathing_disturbance_index", "color": "#22d3ee" }
-                    },
-                    {
-                        "id": "metric-temp-dev",
-                        "type": "metric",
-                        "title": "Body temperature \u0394",
-                        "width": "col-span-3",
-                        "height": "h-32",
-                        "config": { "dataKey": "readiness.temperature_deviation", "color": "#fbbf24" }
-                    },
-                    {
-                        "id": "metric-vascular-age",
-                        "type": "metric",
-                        "title": "Vascular age",
-                        "width": "col-span-3",
-                        "height": "h-32",
-                        "config": { "dataKey": "cardiovascular_age.vascular_age", "color": "#f472b6" }
-                    },
-
-                    {
-                        "id": "metric-steps",
-                        "type": "metric",
-                        "title": "Steps",
-                        "width": "col-span-3",
-                        "height": "h-32",
-                        "config": { "dataKey": "activity.steps", "color": "#f59e0b" }
-                    },
-                    {
-                        "id": "metric-total-cal",
-                        "type": "metric",
-                        "title": "Total calories",
-                        "width": "col-span-3",
-                        "height": "h-32",
-                        "config": { "dataKey": "activity.total_calories", "color": "#f87171" }
-                    },
-                    {
-                        "id": "metric-active-cal",
-                        "type": "metric",
-                        "title": "Active calories",
-                        "width": "col-span-3",
-                        "height": "h-32",
-                        "config": { "dataKey": "activity.active_calories", "color": "#ef4444" }
-                    },
-                    {
-                        "id": "metric-walking-distance",
-                        "type": "metric",
-                        "title": "Walking distance",
-                        "width": "col-span-3",
-                        "height": "h-32",
-                        "config": { "dataKey": "activity.equivalent_walking_distance", "color": "#a3e635" }
-                    },
-
-                    {
-                        "id": "metric-high-time",
-                        "type": "metric",
-                        "title": "High-intensity time",
-                        "width": "col-span-3",
-                        "height": "h-32",
-                        "config": { "dataKey": "activity.high_activity_time", "color": "#ef4444" }
-                    },
-                    {
-                        "id": "metric-medium-time",
-                        "type": "metric",
-                        "title": "Moderate-intensity time",
-                        "width": "col-span-3",
-                        "height": "h-32",
-                        "config": { "dataKey": "activity.medium_activity_time", "color": "#f59e0b" }
-                    },
-                    {
-                        "id": "metric-low-time",
-                        "type": "metric",
-                        "title": "Low-intensity time",
-                        "width": "col-span-3",
-                        "height": "h-32",
-                        "config": { "dataKey": "activity.low_activity_time", "color": "#84cc16" }
-                    },
-                    {
-                        "id": "metric-sedentary-time",
-                        "type": "metric",
-                        "title": "Sedentary time",
-                        "width": "col-span-3",
-                        "height": "h-32",
-                        "config": { "dataKey": "activity.sedentary_time", "color": "#64748b" }
-                    },
-
-                    {
-                        "id": "trend-sleep-hr",
-                        "type": "trend",
-                        "title": "Sleep heart rate",
-                        "width": "col-span-12",
-                        "height": "h-40",
-                        "config": {
-                            "dataKey": "sleep_session.hr_data",
-                            "color": "#f87171",
-                            "dataKeys": ["sleep_session.hr_data"]
-                        }
-                    },
-                    {
-                        "id": "trend-sleep-hrv",
-                        "type": "trend",
-                        "title": "Sleep HRV",
-                        "width": "col-span-12",
-                        "height": "h-40",
-                        "config": {
-                            "dataKey": "sleep_session.hrv_data",
-                            "color": "#fb923c",
-                            "dataKeys": ["sleep_session.hrv_data"]
-                        }
-                    },
-                    {
-                        "id": "trend-sleep-phases",
-                        "type": "trend",
-                        "title": "Hypnogram (Deep · Light · REM · Awake)",
-                        "width": "col-span-12",
-                        "height": "h-40",
-                        "config": {
-                            "dataKey": "sleep_session.sleep_phase_30_sec",
-                            "color": "#8AB4F8",
-                            "dataKeys": ["sleep_session.sleep_phase_30_sec"]
-                        }
-                    },
-                    {
-                        "id": "trend-daytime-stress",
-                        "type": "trend",
-                        "title": "Daytime stress",
-                        "width": "col-span-12",
-                        "height": "h-40",
-                        "config": {
-                            "dataKey": "activity.stress",
-                            "color": "#fbbf24",
-                            "dataKeys": ["activity.stress"]
-                        }
-                    },
-                    {
-                        "id": "bar-steps-30d",
-                        "type": "bar",
-                        "title": "Steps \u00b7 last 30 days",
-                        "width": "col-span-12",
-                        "height": "h-40",
-                        "config": {
-                            "dataKey": "activity.steps",
-                            "color": "#f59e0b",
-                            "dataKeys": ["activity.steps"],
-                            "dateRange": {
-                                "type": "relative",
-                                "value": 30,
-                                "unit": "days",
-                                "anchor": "selected_date"
-                            }
-                        }
-                    },
-
-                    {
-                        "id": "table-sleep-stats",
-                        "type": "table",
-                        "title": "Sleep stats",
-                        "width": "col-span-12",
-                        "height": "h-40",
-                        "config": {
-                            "dataKey": "sleep_session.lowest_heart_rate",
-                            "color": "#8AB4F8",
-                            "dataKeys": [
-                                "sleep_session.bedtime_start",
-                                "sleep_session.bedtime_end",
-                                "sleep_session.total_sleep_duration",
-                                "sleep_session.time_in_bed",
-                                "sleep_session.efficiency",
-                                "sleep_session.latency",
-                                "sleep_session.deep_sleep_duration",
-                                "sleep_session.rem_sleep_duration",
-                                "sleep_session.light_sleep_duration",
-                                "sleep_session.awake_time",
-                                "sleep_session.average_heart_rate",
-                                "sleep_session.lowest_heart_rate",
-                                "sleep_session.average_hrv",
-                                "sleep_session.average_breath",
-                                "sleep_session.restless_periods",
-                                "sleep.average_spo2",
-                                "sleep.breathing_disturbance_index"
-                            ]
-                        }
-                    },
-                    {
-                        "id": "table-activity-stats",
-                        "type": "table",
-                        "title": "Activity stats",
-                        "width": "col-span-12",
-                        "height": "h-40",
-                        "config": {
-                            "dataKey": "activity.steps",
-                            "color": "#f59e0b",
-                            "dataKeys": [
-                                "activity.steps",
-                                "activity.total_calories",
-                                "activity.active_calories",
-                                "activity.target_calories",
-                                "activity.equivalent_walking_distance",
-                                "activity.target_meters",
-                                "activity.high_activity_time",
-                                "activity.medium_activity_time",
-                                "activity.low_activity_time",
-                                "activity.sedentary_time",
-                                "activity.resting_time",
-                                "activity.non_wear_time",
-                                "activity.inactivity_alerts",
-                                "activity.average_met"
-                            ]
-                        }
-                    }
-                ],
-                "layout": [
-                    { "i": "score-sleep",         "x": 0,  "y": 0,  "w": 4, "h": 4 },
-                    { "i": "score-readiness",    "x": 4,  "y": 0,  "w": 4, "h": 4 },
-                    { "i": "score-activity",     "x": 8,  "y": 0,  "w": 4, "h": 4 },
-
-                    { "i": "radar-sleep",         "x": 0,  "y": 4,  "w": 4, "h": 4 },
-                    { "i": "radar-readiness",    "x": 4,  "y": 4,  "w": 4, "h": 4 },
-                    { "i": "radar-activity",     "x": 8,  "y": 4,  "w": 4, "h": 4 },
-
-                    { "i": "pie-sleep-stages",       "x": 0, "y": 8, "w": 6, "h": 4 },
-                    { "i": "metric-yesterday-steps", "x": 9, "y": 8, "w": 3, "h": 4 },
-
-                    { "i": "metric-time-in-bed",      "x": 0, "y": 12, "w": 3, "h": 3 },
-                    { "i": "metric-sleep-latency",    "x": 3, "y": 12, "w": 3, "h": 3 },
-                    { "i": "metric-sleep-efficiency", "x": 6, "y": 12, "w": 3, "h": 3 },
-                    { "i": "metric-awake-time",       "x": 9, "y": 12, "w": 3, "h": 3 },
-
-                    { "i": "metric-avg-hr",  "x": 0, "y": 15, "w": 3, "h": 3 },
-                    { "i": "metric-low-hr",  "x": 3, "y": 15, "w": 3, "h": 3 },
-                    { "i": "metric-hrv",     "x": 6, "y": 15, "w": 3, "h": 3 },
-                    { "i": "metric-breath",  "x": 9, "y": 15, "w": 3, "h": 3 },
-
-                    { "i": "metric-spo2",          "x": 0, "y": 18, "w": 3, "h": 3 },
-                    { "i": "metric-bdi",           "x": 3, "y": 18, "w": 3, "h": 3 },
-                    { "i": "metric-temp-dev",      "x": 6, "y": 18, "w": 3, "h": 3 },
-                    { "i": "metric-vascular-age",  "x": 9, "y": 18, "w": 3, "h": 3 },
-
-                    { "i": "metric-steps",            "x": 0, "y": 21, "w": 3, "h": 3 },
-                    { "i": "metric-total-cal",        "x": 3, "y": 21, "w": 3, "h": 3 },
-                    { "i": "metric-active-cal",       "x": 6, "y": 21, "w": 3, "h": 3 },
-                    { "i": "metric-walking-distance", "x": 9, "y": 21, "w": 3, "h": 3 },
-
-                    { "i": "metric-high-time",    "x": 0, "y": 24, "w": 3, "h": 3 },
-                    { "i": "metric-medium-time",  "x": 3, "y": 24, "w": 3, "h": 3 },
-                    { "i": "metric-low-time",     "x": 6, "y": 24, "w": 3, "h": 3 },
-                    { "i": "metric-sedentary-time","x": 9, "y": 24, "w": 3, "h": 3 },
-
-                    { "i": "trend-sleep-hr",       "x": 0, "y": 27, "w": 12, "h": 5 },
-                    { "i": "trend-sleep-hrv",      "x": 0, "y": 32, "w": 12, "h": 5 },
-                    { "i": "trend-sleep-phases",   "x": 0, "y": 37, "w": 12, "h": 5 },
-                    { "i": "trend-daytime-stress", "x": 0, "y": 42, "w": 12, "h": 5 },
-                    { "i": "bar-steps-30d",        "x": 0, "y": 47, "w": 12, "h": 5 },
-
-                    { "i": "table-sleep-stats",    "x": 0, "y": 52, "w": 6, "h": 13 },
-                    { "i": "table-activity-stats", "x": 6, "y": 52, "w": 6, "h": 13 }
-                ]
-            },
-            {
-                "id": "trends",
-                "name": "Trends",
-                "widgets": [
-                    {
-                        "id": "trend-sleep-score",
-                        "type": "trend",
-                        "title": "Sleep score",
-                        "width": "col-span-12",
-                        "height": "h-40",
-                        "config": {
-                            "dataKey": "sleep.score",
-                            "color": "#8AB4F8",
-                            "dataKeys": ["sleep.score"],
-                            "dateRange": { "type": "relative", "value": 90, "unit": "days", "anchor": "selected_date" }
-                        }
-                    },
-                    {
-                        "id": "trend-readiness-score",
-                        "type": "trend",
-                        "title": "Readiness score",
-                        "width": "col-span-12",
-                        "height": "h-40",
-                        "config": {
-                            "dataKey": "readiness.score",
-                            "color": "#4ade80",
-                            "dataKeys": ["readiness.score"],
-                            "dateRange": { "type": "relative", "value": 90, "unit": "days", "anchor": "selected_date" }
-                        }
-                    },
-                    {
-                        "id": "trend-activity-score",
-                        "type": "trend",
-                        "title": "Activity score",
-                        "width": "col-span-12",
-                        "height": "h-40",
-                        "config": {
-                            "dataKey": "activity.score",
-                            "color": "#f87171",
-                            "dataKeys": ["activity.score"],
-                            "dateRange": { "type": "relative", "value": 90, "unit": "days", "anchor": "selected_date" }
-                        }
-                    },
-
-                    {
-                        "id": "trend-sleep-stages",
-                        "type": "trend",
-                        "title": "Sleep stages",
-                        "width": "col-span-12",
-                        "height": "h-40",
-                        "config": {
-                            "dataKey": "sleep_session.total_sleep_duration",
-                            "color": "#8AB4F8",
-                            "dataKeys": [
-                                "sleep_session.total_sleep_duration",
-                                "sleep_session.deep_sleep_duration",
-                                "sleep_session.rem_sleep_duration",
-                                "sleep_session.light_sleep_duration",
-                                "sleep_session.awake_time"
-                            ],
-                            "dateRange": { "type": "relative", "value": 60, "unit": "days", "anchor": "selected_date" }
-                        }
-                    },
-                    {
-                        "id": "trend-sleep-timing",
-                        "type": "trend",
-                        "title": "Sleep efficiency & latency",
-                        "width": "col-span-12",
-                        "height": "h-40",
-                        "config": {
-                            "dataKey": "sleep_session.efficiency",
-                            "color": "#8AB4F8",
-                            "dataKeys": [
-                                "sleep_session.efficiency",
-                                "sleep_session.latency"
-                            ],
-                            "dateRange": { "type": "relative", "value": 60, "unit": "days", "anchor": "selected_date" }
-                        }
-                    },
-
-                    {
-                        "id": "trend-heart-rates",
-                        "type": "trend",
-                        "title": "Sleep heart rate vs. lowest",
-                        "width": "col-span-12",
-                        "height": "h-40",
-                        "config": {
-                            "dataKey": "sleep_session.average_heart_rate",
-                            "color": "#f87171",
-                            "dataKeys": [
-                                "sleep_session.average_heart_rate",
-                                "sleep_session.lowest_heart_rate"
-                            ],
-                            "dateRange": { "type": "relative", "value": 60, "unit": "days", "anchor": "selected_date" }
-                        }
-                    },
-                    {
-                        "id": "trend-hrv",
-                        "type": "trend",
-                        "title": "Average HRV",
-                        "width": "col-span-12",
-                        "height": "h-40",
-                        "config": {
-                            "dataKey": "sleep_session.average_hrv",
-                            "color": "#fb923c",
-                            "dataKeys": ["sleep_session.average_hrv"],
-                            "dateRange": { "type": "relative", "value": 60, "unit": "days", "anchor": "selected_date" }
-                        }
-                    },
-                    {
-                        "id": "trend-breath",
-                        "type": "trend",
-                        "title": "Average breath rate",
-                        "width": "col-span-12",
-                        "height": "h-40",
-                        "config": {
-                            "dataKey": "sleep_session.average_breath",
-                            "color": "#22d3ee",
-                            "dataKeys": ["sleep_session.average_breath"],
-                            "dateRange": { "type": "relative", "value": 60, "unit": "days", "anchor": "selected_date" }
-                        }
-                    },
-
-                    {
-                        "id": "bar-steps",
-                        "type": "bar",
-                        "title": "Steps",
-                        "width": "col-span-12",
-                        "height": "h-40",
-                        "config": {
-                            "dataKey": "activity.steps",
-                            "color": "#f59e0b",
-                            "dataKeys": ["activity.steps"],
-                            "dateRange": { "type": "relative", "value": 60, "unit": "days", "anchor": "selected_date" }
-                        }
-                    },
-                    {
-                        "id": "trend-calories",
-                        "type": "trend",
-                        "title": "Calories burned",
-                        "width": "col-span-12",
-                        "height": "h-40",
-                        "config": {
-                            "dataKey": "activity.total_calories",
-                            "color": "#ef4444",
-                            "dataKeys": [
-                                "activity.total_calories",
-                                "activity.active_calories"
-                            ],
-                            "dateRange": { "type": "relative", "value": 60, "unit": "days", "anchor": "selected_date" }
-                        }
-                    },
-                    {
-                        "id": "trend-walking-distance",
-                        "type": "trend",
-                        "title": "Walking distance",
-                        "width": "col-span-12",
-                        "height": "h-40",
-                        "config": {
-                            "dataKey": "activity.equivalent_walking_distance",
-                            "color": "#a3e635",
-                            "dataKeys": ["activity.equivalent_walking_distance"],
-                            "dateRange": { "type": "relative", "value": 60, "unit": "days", "anchor": "selected_date" }
-                        }
-                    },
-                    {
-                        "id": "trend-activity-time",
-                        "type": "trend",
-                        "title": "Activity time breakdown",
-                        "width": "col-span-12",
-                        "height": "h-40",
-                        "config": {
-                            "dataKey": "activity.high_activity_time",
-                            "color": "#ef4444",
-                            "dataKeys": [
-                                "activity.high_activity_time",
-                                "activity.medium_activity_time",
-                                "activity.low_activity_time",
-                                "activity.sedentary_time"
-                            ],
-                            "dateRange": { "type": "relative", "value": 60, "unit": "days", "anchor": "selected_date" }
-                        }
-                    },
-                    {
-                        "id": "trend-met",
-                        "type": "trend",
-                        "title": "Average MET",
-                        "width": "col-span-12",
-                        "height": "h-40",
-                        "config": {
-                            "dataKey": "activity.average_met",
-                            "color": "#fb923c",
-                            "dataKeys": ["activity.average_met"],
-                            "dateRange": { "type": "relative", "value": 60, "unit": "days", "anchor": "selected_date" }
-                        }
-                    },
-
-                    {
-                        "id": "trend-temp-dev",
-                        "type": "trend",
-                        "title": "Body temperature deviation",
-                        "width": "col-span-12",
-                        "height": "h-40",
-                        "config": {
-                            "dataKey": "readiness.temperature_deviation",
-                            "color": "#fbbf24",
-                            "dataKeys": [
-                                "readiness.temperature_deviation",
-                                "readiness.temperature_trend_deviation"
-                            ],
-                            "dateRange": { "type": "relative", "value": 60, "unit": "days", "anchor": "selected_date" }
-                        }
-                    },
-                    {
-                        "id": "trend-spo2",
-                        "type": "trend",
-                        "title": "Average SpO\u2082",
-                        "width": "col-span-12",
-                        "height": "h-40",
-                        "config": {
-                            "dataKey": "sleep.average_spo2",
-                            "color": "#34d399",
-                            "dataKeys": ["sleep.average_spo2"],
-                            "dateRange": { "type": "relative", "value": 60, "unit": "days", "anchor": "selected_date" }
-                        }
-                    },
-                    {
-                        "id": "trend-resilience",
-                        "type": "trend",
-                        "title": "Resilience",
-                        "width": "col-span-12",
-                        "height": "h-40",
-                        "config": {
-                            "dataKey": "resilience.stress",
-                            "color": "#a78bfa",
-                            "dataKeys": [
-                                "resilience.sleep_recovery",
-                                "resilience.daytime_recovery",
-                                "resilience.stress"
-                            ],
-                            "dateRange": { "type": "relative", "value": 60, "unit": "days", "anchor": "selected_date" }
-                        }
-                    },
-                    {
-                        "id": "trend-vascular-age",
-                        "type": "trend",
-                        "title": "Cardiovascular age",
-                        "width": "col-span-12",
-                        "height": "h-40",
-                        "config": {
-                            "dataKey": "cardiovascular_age.vascular_age",
-                            "color": "#f472b6",
-                            "dataKeys": ["cardiovascular_age.vascular_age"],
-                            "dateRange": { "type": "relative", "value": 90, "unit": "days", "anchor": "selected_date" }
-                        }
-                    }
-                ],
-                "layout": [
-                    { "i": "trend-sleep-score",       "x": 0, "y": 0,  "w": 12, "h": 6 },
-                    { "i": "trend-readiness-score",   "x": 0, "y": 6,  "w": 12, "h": 6 },
-                    { "i": "trend-activity-score",    "x": 0, "y": 12, "w": 12, "h": 6 },
-                    { "i": "trend-sleep-stages",      "x": 0, "y": 18, "w": 12, "h": 6 },
-                    { "i": "trend-sleep-timing",      "x": 0, "y": 24, "w": 12, "h": 6 },
-                    { "i": "trend-heart-rates",       "x": 0, "y": 30, "w": 12, "h": 6 },
-                    { "i": "trend-hrv",               "x": 0, "y": 36, "w": 12, "h": 6 },
-                    { "i": "trend-breath",            "x": 0, "y": 42, "w": 12, "h": 6 },
-                    { "i": "bar-steps",               "x": 0, "y": 48, "w": 12, "h": 6 },
-                    { "i": "trend-calories",          "x": 0, "y": 54, "w": 12, "h": 6 },
-                    { "i": "trend-walking-distance",  "x": 0, "y": 60, "w": 12, "h": 6 },
-                    { "i": "trend-activity-time",     "x": 0, "y": 66, "w": 12, "h": 6 },
-                    { "i": "trend-met",               "x": 0, "y": 72, "w": 12, "h": 6 },
-                    { "i": "trend-temp-dev",          "x": 0, "y": 78, "w": 12, "h": 6 },
-                    { "i": "trend-spo2",              "x": 0, "y": 84, "w": 12, "h": 6 },
-                    { "i": "trend-resilience",        "x": 0, "y": 90, "w": 12, "h": 6 },
-                    { "i": "trend-vascular-age",      "x": 0, "y": 96, "w": 12, "h": 6 }
-                ]
+  "dashboard": {
+    "dashboards": [
+      {
+        "id": "default",
+        "name": "Daily",
+        "widgets": [
+          {
+            "id": "score-sleep",
+            "type": "score",
+            "title": "Sleep score",
+            "width": "col-span-4",
+            "height": "h-40",
+            "config": {
+              "dataKey": "sleep.score",
+              "color": "#8AB4F8"
             }
+          },
+          {
+            "id": "score-readiness",
+            "type": "score",
+            "title": "Readiness score",
+            "width": "col-span-4",
+            "height": "h-40",
+            "config": {
+              "dataKey": "readiness.score",
+              "color": "#4ade80"
+            }
+          },
+          {
+            "id": "score-activity",
+            "type": "score",
+            "title": "Activity score",
+            "width": "col-span-4",
+            "height": "h-40",
+            "config": {
+              "dataKey": "activity.score",
+              "color": "#f87171"
+            }
+          },
+          {
+            "id": "radar-sleep",
+            "type": "radar",
+            "title": "Sleep contributors",
+            "width": "col-span-4",
+            "height": "h-40",
+            "config": {
+              "dataKey": "sleep.contributors",
+              "color": "#8AB4F8"
+            }
+          },
+          {
+            "id": "radar-readiness",
+            "type": "radar",
+            "title": "Readiness contributors",
+            "width": "col-span-4",
+            "height": "h-40",
+            "config": {
+              "dataKey": "readiness.contributors",
+              "color": "#4ade80"
+            }
+          },
+          {
+            "id": "radar-activity",
+            "type": "radar",
+            "title": "Activity contributors",
+            "width": "col-span-4",
+            "height": "h-40",
+            "config": {
+              "dataKey": "activity.contributors",
+              "color": "#f87171"
+            }
+          },
+          {
+            "id": "pie-sleep-stages",
+            "type": "pie",
+            "title": "Sleep stages",
+            "width": "col-span-12",
+            "height": "h-40",
+            "config": {
+              "dataKey": "sleep_session.deep_sleep_duration",
+              "color": "#6366f1",
+              "totalCaption": "Total sleep",
+              "totalDataKey": "sleep_session.total_sleep_duration",
+              "dataKeys": [
+                "sleep_session.deep_sleep_duration",
+                "sleep_session.rem_sleep_duration",
+                "sleep_session.light_sleep_duration",
+                "sleep_session.awake_time"
+              ],
+              "colors": [
+                "#6366f1",
+                "#a78bfa",
+                "#60a5fa",
+                "#fbbf24"
+              ]
+            }
+          },
+          {
+            "id": "metric-yesterday-steps",
+            "type": "metric",
+            "title": "Yesterday's steps",
+            "width": "col-span-3",
+            "height": "h-40",
+            "config": {
+              "dataKey": "activity.steps",
+              "color": "#f59e0b",
+              "dateOffset": -1
+            }
+          },
+          {
+            "id": "metric-time-in-bed",
+            "type": "metric",
+            "title": "Time in bed",
+            "width": "col-span-3",
+            "height": "h-32",
+            "config": {
+              "dataKey": "sleep_session.time_in_bed",
+              "color": "#8AB4F8"
+            }
+          },
+          {
+            "id": "metric-sleep-latency",
+            "type": "metric",
+            "title": "Sleep latency",
+            "width": "col-span-3",
+            "height": "h-32",
+            "config": {
+              "dataKey": "sleep_session.latency",
+              "color": "#8AB4F8"
+            }
+          },
+          {
+            "id": "metric-sleep-efficiency",
+            "type": "metric",
+            "title": "Sleep efficiency",
+            "width": "col-span-3",
+            "height": "h-32",
+            "config": {
+              "dataKey": "sleep_session.efficiency",
+              "color": "#8AB4F8"
+            }
+          },
+          {
+            "id": "metric-awake-time",
+            "type": "metric",
+            "title": "Awake time",
+            "width": "col-span-3",
+            "height": "h-32",
+            "config": {
+              "dataKey": "sleep_session.awake_time",
+              "color": "#8AB4F8"
+            }
+          },
+          {
+            "id": "metric-avg-hr",
+            "type": "metric",
+            "title": "Average heart rate",
+            "width": "col-span-3",
+            "height": "h-32",
+            "config": {
+              "dataKey": "sleep_session.average_heart_rate",
+              "color": "#f87171"
+            }
+          },
+          {
+            "id": "metric-low-hr",
+            "type": "metric",
+            "title": "Lowest heart rate",
+            "width": "col-span-3",
+            "height": "h-32",
+            "config": {
+              "dataKey": "sleep_session.lowest_heart_rate",
+              "color": "#f87171"
+            }
+          },
+          {
+            "id": "metric-hrv",
+            "type": "metric",
+            "title": "Average HRV",
+            "width": "col-span-3",
+            "height": "h-32",
+            "config": {
+              "dataKey": "sleep_session.average_hrv",
+              "color": "#fb923c"
+            }
+          },
+          {
+            "id": "metric-breath",
+            "type": "metric",
+            "title": "Average breath rate",
+            "width": "col-span-3",
+            "height": "h-32",
+            "config": {
+              "dataKey": "sleep_session.average_breath",
+              "color": "#22d3ee"
+            }
+          },
+          {
+            "id": "metric-spo2",
+            "type": "metric",
+            "title": "Average SpO\u2082",
+            "width": "col-span-3",
+            "height": "h-32",
+            "config": {
+              "dataKey": "sleep.average_spo2",
+              "color": "#34d399"
+            }
+          },
+          {
+            "id": "metric-bdi",
+            "type": "metric",
+            "title": "Breathing disturbance",
+            "width": "col-span-3",
+            "height": "h-32",
+            "config": {
+              "dataKey": "sleep.breathing_disturbance_index",
+              "color": "#22d3ee"
+            }
+          },
+          {
+            "id": "metric-temp-dev",
+            "type": "metric",
+            "title": "Body temperature \u0394",
+            "width": "col-span-3",
+            "height": "h-32",
+            "config": {
+              "dataKey": "readiness.temperature_deviation",
+              "color": "#fbbf24"
+            }
+          },
+          {
+            "id": "metric-vascular-age",
+            "type": "metric",
+            "title": "Vascular age",
+            "width": "col-span-3",
+            "height": "h-32",
+            "config": {
+              "dataKey": "cardiovascular_age.vascular_age",
+              "color": "#f472b6"
+            }
+          },
+          {
+            "id": "metric-steps",
+            "type": "metric",
+            "title": "Steps",
+            "width": "col-span-3",
+            "height": "h-32",
+            "config": {
+              "dataKey": "activity.steps",
+              "color": "#f59e0b"
+            }
+          },
+          {
+            "id": "metric-total-cal",
+            "type": "metric",
+            "title": "Total calories",
+            "width": "col-span-3",
+            "height": "h-32",
+            "config": {
+              "dataKey": "activity.total_calories",
+              "color": "#f87171"
+            }
+          },
+          {
+            "id": "metric-active-cal",
+            "type": "metric",
+            "title": "Active calories",
+            "width": "col-span-3",
+            "height": "h-32",
+            "config": {
+              "dataKey": "activity.active_calories",
+              "color": "#ef4444"
+            }
+          },
+          {
+            "id": "metric-walking-distance",
+            "type": "metric",
+            "title": "Walking distance",
+            "width": "col-span-3",
+            "height": "h-32",
+            "config": {
+              "dataKey": "activity.equivalent_walking_distance",
+              "color": "#a3e635"
+            }
+          },
+          {
+            "id": "metric-high-time",
+            "type": "metric",
+            "title": "High-intensity time",
+            "width": "col-span-3",
+            "height": "h-32",
+            "config": {
+              "dataKey": "activity.high_activity_time",
+              "color": "#ef4444"
+            }
+          },
+          {
+            "id": "metric-medium-time",
+            "type": "metric",
+            "title": "Moderate-intensity time",
+            "width": "col-span-3",
+            "height": "h-32",
+            "config": {
+              "dataKey": "activity.medium_activity_time",
+              "color": "#f59e0b"
+            }
+          },
+          {
+            "id": "metric-low-time",
+            "type": "metric",
+            "title": "Low-intensity time",
+            "width": "col-span-3",
+            "height": "h-32",
+            "config": {
+              "dataKey": "activity.low_activity_time",
+              "color": "#84cc16"
+            }
+          },
+          {
+            "id": "metric-sedentary-time",
+            "type": "metric",
+            "title": "Sedentary time",
+            "width": "col-span-3",
+            "height": "h-32",
+            "config": {
+              "dataKey": "activity.sedentary_time",
+              "color": "#64748b"
+            }
+          },
+          {
+            "id": "trend-sleep-hr",
+            "type": "trend",
+            "title": "Sleep heart rate",
+            "width": "col-span-12",
+            "height": "h-40",
+            "config": {
+              "dataKey": "sleep_session.hr_data",
+              "color": "#f87171",
+              "dataKeys": [
+                "sleep_session.hr_data"
+              ]
+            }
+          },
+          {
+            "id": "trend-sleep-hrv",
+            "type": "trend",
+            "title": "Sleep HRV",
+            "width": "col-span-12",
+            "height": "h-40",
+            "config": {
+              "dataKey": "sleep_session.hrv_data",
+              "color": "#fb923c",
+              "dataKeys": [
+                "sleep_session.hrv_data"
+              ]
+            }
+          },
+          {
+            "id": "trend-sleep-phases",
+            "type": "trend",
+            "title": "Hypnogram (Deep \u00b7 Light \u00b7 REM \u00b7 Awake)",
+            "width": "col-span-12",
+            "height": "h-40",
+            "config": {
+              "dataKey": "sleep_session.sleep_phase_30_sec",
+              "color": "#8AB4F8",
+              "dataKeys": [
+                "sleep_session.sleep_phase_30_sec"
+              ]
+            }
+          },
+          {
+            "id": "trend-daytime-stress",
+            "type": "trend",
+            "title": "Daytime stress",
+            "width": "col-span-12",
+            "height": "h-40",
+            "config": {
+              "dataKey": "activity.stress",
+              "color": "#fbbf24",
+              "dataKeys": [
+                "activity.stress"
+              ]
+            }
+          },
+          {
+            "id": "bar-steps-30d",
+            "type": "bar",
+            "title": "Steps \u00b7 last 30 days",
+            "width": "col-span-12",
+            "height": "h-40",
+            "config": {
+              "dataKey": "activity.steps",
+              "color": "#f59e0b",
+              "dataKeys": [
+                "activity.steps"
+              ],
+              "dateRange": {
+                "type": "relative",
+                "value": 30,
+                "unit": "days",
+                "anchor": "selected_date"
+              }
+            }
+          },
+          {
+            "id": "table-sleep-stats",
+            "type": "table",
+            "title": "Sleep stats",
+            "width": "col-span-12",
+            "height": "h-40",
+            "config": {
+              "dataKey": "sleep_session.lowest_heart_rate",
+              "color": "#8AB4F8",
+              "dataKeys": [
+                "sleep_session.bedtime_start",
+                "sleep_session.bedtime_end",
+                "sleep_session.total_sleep_duration",
+                "sleep_session.time_in_bed",
+                "sleep_session.efficiency",
+                "sleep_session.latency",
+                "sleep_session.deep_sleep_duration",
+                "sleep_session.rem_sleep_duration",
+                "sleep_session.light_sleep_duration",
+                "sleep_session.awake_time",
+                "sleep_session.average_heart_rate",
+                "sleep_session.lowest_heart_rate",
+                "sleep_session.average_hrv",
+                "sleep_session.average_breath",
+                "sleep_session.restless_periods",
+                "sleep.average_spo2",
+                "sleep.breathing_disturbance_index"
+              ]
+            }
+          },
+          {
+            "id": "table-activity-stats",
+            "type": "table",
+            "title": "Activity stats",
+            "width": "col-span-12",
+            "height": "h-40",
+            "config": {
+              "dataKey": "activity.steps",
+              "color": "#f59e0b",
+              "dataKeys": [
+                "activity.steps",
+                "activity.total_calories",
+                "activity.active_calories",
+                "activity.target_calories",
+                "activity.equivalent_walking_distance",
+                "activity.target_meters",
+                "activity.high_activity_time",
+                "activity.medium_activity_time",
+                "activity.low_activity_time",
+                "activity.sedentary_time",
+                "activity.resting_time",
+                "activity.non_wear_time",
+                "activity.inactivity_alerts",
+                "activity.average_met"
+              ]
+            }
+          }
         ],
-        "activeDashboardId": "default"
-    }
+        "layout": [
+          {
+            "i": "score-sleep",
+            "x": 0,
+            "y": 0,
+            "w": 4,
+            "h": 4
+          },
+          {
+            "i": "score-readiness",
+            "x": 4,
+            "y": 0,
+            "w": 4,
+            "h": 4
+          },
+          {
+            "i": "score-activity",
+            "x": 8,
+            "y": 0,
+            "w": 4,
+            "h": 4
+          },
+          {
+            "i": "radar-sleep",
+            "x": 0,
+            "y": 4,
+            "w": 4,
+            "h": 4
+          },
+          {
+            "i": "radar-readiness",
+            "x": 4,
+            "y": 4,
+            "w": 4,
+            "h": 4
+          },
+          {
+            "i": "radar-activity",
+            "x": 8,
+            "y": 4,
+            "w": 4,
+            "h": 4
+          },
+          {
+            "i": "pie-sleep-stages",
+            "x": 0,
+            "y": 8,
+            "w": 12,
+            "h": 4
+          },
+          {
+            "i": "metric-yesterday-steps",
+            "x": 9,
+            "y": 8,
+            "w": 3,
+            "h": 4
+          },
+          {
+            "i": "metric-time-in-bed",
+            "x": 0,
+            "y": 12,
+            "w": 3,
+            "h": 3
+          },
+          {
+            "i": "metric-sleep-latency",
+            "x": 3,
+            "y": 12,
+            "w": 3,
+            "h": 3
+          },
+          {
+            "i": "metric-sleep-efficiency",
+            "x": 6,
+            "y": 12,
+            "w": 3,
+            "h": 3
+          },
+          {
+            "i": "metric-awake-time",
+            "x": 9,
+            "y": 12,
+            "w": 3,
+            "h": 3
+          },
+          {
+            "i": "metric-avg-hr",
+            "x": 0,
+            "y": 15,
+            "w": 3,
+            "h": 3
+          },
+          {
+            "i": "metric-low-hr",
+            "x": 3,
+            "y": 15,
+            "w": 3,
+            "h": 3
+          },
+          {
+            "i": "metric-hrv",
+            "x": 6,
+            "y": 15,
+            "w": 3,
+            "h": 3
+          },
+          {
+            "i": "metric-breath",
+            "x": 9,
+            "y": 15,
+            "w": 3,
+            "h": 3
+          },
+          {
+            "i": "metric-spo2",
+            "x": 0,
+            "y": 18,
+            "w": 3,
+            "h": 3
+          },
+          {
+            "i": "metric-bdi",
+            "x": 3,
+            "y": 18,
+            "w": 3,
+            "h": 3
+          },
+          {
+            "i": "metric-temp-dev",
+            "x": 6,
+            "y": 18,
+            "w": 3,
+            "h": 3
+          },
+          {
+            "i": "metric-vascular-age",
+            "x": 9,
+            "y": 18,
+            "w": 3,
+            "h": 3
+          },
+          {
+            "i": "metric-steps",
+            "x": 0,
+            "y": 21,
+            "w": 3,
+            "h": 3
+          },
+          {
+            "i": "metric-total-cal",
+            "x": 3,
+            "y": 21,
+            "w": 3,
+            "h": 3
+          },
+          {
+            "i": "metric-active-cal",
+            "x": 6,
+            "y": 21,
+            "w": 3,
+            "h": 3
+          },
+          {
+            "i": "metric-walking-distance",
+            "x": 9,
+            "y": 21,
+            "w": 3,
+            "h": 3
+          },
+          {
+            "i": "metric-high-time",
+            "x": 0,
+            "y": 24,
+            "w": 3,
+            "h": 3
+          },
+          {
+            "i": "metric-medium-time",
+            "x": 3,
+            "y": 24,
+            "w": 3,
+            "h": 3
+          },
+          {
+            "i": "metric-low-time",
+            "x": 6,
+            "y": 24,
+            "w": 3,
+            "h": 3
+          },
+          {
+            "i": "metric-sedentary-time",
+            "x": 9,
+            "y": 24,
+            "w": 3,
+            "h": 3
+          },
+          {
+            "i": "trend-sleep-hr",
+            "x": 0,
+            "y": 27,
+            "w": 12,
+            "h": 5
+          },
+          {
+            "i": "trend-sleep-hrv",
+            "x": 0,
+            "y": 32,
+            "w": 12,
+            "h": 5
+          },
+          {
+            "i": "trend-sleep-phases",
+            "x": 0,
+            "y": 37,
+            "w": 12,
+            "h": 5
+          },
+          {
+            "i": "trend-daytime-stress",
+            "x": 0,
+            "y": 42,
+            "w": 12,
+            "h": 5
+          },
+          {
+            "i": "bar-steps-30d",
+            "x": 0,
+            "y": 47,
+            "w": 12,
+            "h": 5
+          },
+          {
+            "i": "table-sleep-stats",
+            "x": 0,
+            "y": 52,
+            "w": 6,
+            "h": 13
+          },
+          {
+            "i": "table-activity-stats",
+            "x": 6,
+            "y": 52,
+            "w": 6,
+            "h": 13
+          }
+        ]
+      },
+      {
+        "id": "trends",
+        "name": "Trends",
+        "widgets": [
+          {
+            "id": "trend-sleep-score",
+            "type": "trend",
+            "title": "Sleep score",
+            "width": "col-span-12",
+            "height": "h-40",
+            "config": {
+              "dataKey": "sleep.score",
+              "color": "#8AB4F8",
+              "dataKeys": [
+                "sleep.score"
+              ],
+              "dateRange": {
+                "type": "relative",
+                "value": 90,
+                "unit": "days",
+                "anchor": "selected_date"
+              }
+            }
+          },
+          {
+            "id": "trend-readiness-score",
+            "type": "trend",
+            "title": "Readiness score",
+            "width": "col-span-12",
+            "height": "h-40",
+            "config": {
+              "dataKey": "readiness.score",
+              "color": "#4ade80",
+              "dataKeys": [
+                "readiness.score"
+              ],
+              "dateRange": {
+                "type": "relative",
+                "value": 90,
+                "unit": "days",
+                "anchor": "selected_date"
+              }
+            }
+          },
+          {
+            "id": "trend-activity-score",
+            "type": "trend",
+            "title": "Activity score",
+            "width": "col-span-12",
+            "height": "h-40",
+            "config": {
+              "dataKey": "activity.score",
+              "color": "#f87171",
+              "dataKeys": [
+                "activity.score"
+              ],
+              "dateRange": {
+                "type": "relative",
+                "value": 90,
+                "unit": "days",
+                "anchor": "selected_date"
+              }
+            }
+          },
+          {
+            "id": "trend-sleep-stages",
+            "type": "trend",
+            "title": "Sleep stages",
+            "width": "col-span-12",
+            "height": "h-40",
+            "config": {
+              "dataKey": "sleep_session.total_sleep_duration",
+              "color": "#8AB4F8",
+              "dataKeys": [
+                "sleep_session.total_sleep_duration",
+                "sleep_session.deep_sleep_duration",
+                "sleep_session.rem_sleep_duration",
+                "sleep_session.light_sleep_duration",
+                "sleep_session.awake_time"
+              ],
+              "dateRange": {
+                "type": "relative",
+                "value": 60,
+                "unit": "days",
+                "anchor": "selected_date"
+              }
+            }
+          },
+          {
+            "id": "trend-sleep-timing",
+            "type": "trend",
+            "title": "Sleep efficiency & latency",
+            "width": "col-span-12",
+            "height": "h-40",
+            "config": {
+              "dataKey": "sleep_session.efficiency",
+              "color": "#8AB4F8",
+              "dataKeys": [
+                "sleep_session.efficiency",
+                "sleep_session.latency"
+              ],
+              "dateRange": {
+                "type": "relative",
+                "value": 60,
+                "unit": "days",
+                "anchor": "selected_date"
+              }
+            }
+          },
+          {
+            "id": "trend-heart-rates",
+            "type": "trend",
+            "title": "Sleep heart rate vs. lowest",
+            "width": "col-span-12",
+            "height": "h-40",
+            "config": {
+              "dataKey": "sleep_session.average_heart_rate",
+              "color": "#f87171",
+              "dataKeys": [
+                "sleep_session.average_heart_rate",
+                "sleep_session.lowest_heart_rate"
+              ],
+              "dateRange": {
+                "type": "relative",
+                "value": 60,
+                "unit": "days",
+                "anchor": "selected_date"
+              }
+            }
+          },
+          {
+            "id": "trend-hrv",
+            "type": "trend",
+            "title": "Average HRV",
+            "width": "col-span-12",
+            "height": "h-40",
+            "config": {
+              "dataKey": "sleep_session.average_hrv",
+              "color": "#fb923c",
+              "dataKeys": [
+                "sleep_session.average_hrv"
+              ],
+              "dateRange": {
+                "type": "relative",
+                "value": 60,
+                "unit": "days",
+                "anchor": "selected_date"
+              }
+            }
+          },
+          {
+            "id": "trend-breath",
+            "type": "trend",
+            "title": "Average breath rate",
+            "width": "col-span-12",
+            "height": "h-40",
+            "config": {
+              "dataKey": "sleep_session.average_breath",
+              "color": "#22d3ee",
+              "dataKeys": [
+                "sleep_session.average_breath"
+              ],
+              "dateRange": {
+                "type": "relative",
+                "value": 60,
+                "unit": "days",
+                "anchor": "selected_date"
+              }
+            }
+          },
+          {
+            "id": "bar-steps",
+            "type": "bar",
+            "title": "Steps",
+            "width": "col-span-12",
+            "height": "h-40",
+            "config": {
+              "dataKey": "activity.steps",
+              "color": "#f59e0b",
+              "dataKeys": [
+                "activity.steps"
+              ],
+              "dateRange": {
+                "type": "relative",
+                "value": 60,
+                "unit": "days",
+                "anchor": "selected_date"
+              }
+            }
+          },
+          {
+            "id": "trend-calories",
+            "type": "trend",
+            "title": "Calories burned",
+            "width": "col-span-12",
+            "height": "h-40",
+            "config": {
+              "dataKey": "activity.total_calories",
+              "color": "#ef4444",
+              "dataKeys": [
+                "activity.total_calories",
+                "activity.active_calories"
+              ],
+              "dateRange": {
+                "type": "relative",
+                "value": 60,
+                "unit": "days",
+                "anchor": "selected_date"
+              }
+            }
+          },
+          {
+            "id": "trend-walking-distance",
+            "type": "trend",
+            "title": "Walking distance",
+            "width": "col-span-12",
+            "height": "h-40",
+            "config": {
+              "dataKey": "activity.equivalent_walking_distance",
+              "color": "#a3e635",
+              "dataKeys": [
+                "activity.equivalent_walking_distance"
+              ],
+              "dateRange": {
+                "type": "relative",
+                "value": 60,
+                "unit": "days",
+                "anchor": "selected_date"
+              }
+            }
+          },
+          {
+            "id": "trend-activity-time",
+            "type": "trend",
+            "title": "Activity time breakdown",
+            "width": "col-span-12",
+            "height": "h-40",
+            "config": {
+              "dataKey": "activity.high_activity_time",
+              "color": "#ef4444",
+              "dataKeys": [
+                "activity.high_activity_time",
+                "activity.medium_activity_time",
+                "activity.low_activity_time",
+                "activity.sedentary_time"
+              ],
+              "dateRange": {
+                "type": "relative",
+                "value": 60,
+                "unit": "days",
+                "anchor": "selected_date"
+              }
+            }
+          },
+          {
+            "id": "trend-met",
+            "type": "trend",
+            "title": "Average MET",
+            "width": "col-span-12",
+            "height": "h-40",
+            "config": {
+              "dataKey": "activity.average_met",
+              "color": "#fb923c",
+              "dataKeys": [
+                "activity.average_met"
+              ],
+              "dateRange": {
+                "type": "relative",
+                "value": 60,
+                "unit": "days",
+                "anchor": "selected_date"
+              }
+            }
+          },
+          {
+            "id": "trend-temp-dev",
+            "type": "trend",
+            "title": "Body temperature deviation",
+            "width": "col-span-12",
+            "height": "h-40",
+            "config": {
+              "dataKey": "readiness.temperature_deviation",
+              "color": "#fbbf24",
+              "dataKeys": [
+                "readiness.temperature_deviation",
+                "readiness.temperature_trend_deviation"
+              ],
+              "dateRange": {
+                "type": "relative",
+                "value": 60,
+                "unit": "days",
+                "anchor": "selected_date"
+              }
+            }
+          },
+          {
+            "id": "trend-spo2",
+            "type": "trend",
+            "title": "Average SpO\u2082",
+            "width": "col-span-12",
+            "height": "h-40",
+            "config": {
+              "dataKey": "sleep.average_spo2",
+              "color": "#34d399",
+              "dataKeys": [
+                "sleep.average_spo2"
+              ],
+              "dateRange": {
+                "type": "relative",
+                "value": 60,
+                "unit": "days",
+                "anchor": "selected_date"
+              }
+            }
+          },
+          {
+            "id": "trend-resilience",
+            "type": "trend",
+            "title": "Resilience",
+            "width": "col-span-12",
+            "height": "h-40",
+            "config": {
+              "dataKey": "resilience.stress",
+              "color": "#a78bfa",
+              "dataKeys": [
+                "resilience.sleep_recovery",
+                "resilience.daytime_recovery",
+                "resilience.stress"
+              ],
+              "dateRange": {
+                "type": "relative",
+                "value": 60,
+                "unit": "days",
+                "anchor": "selected_date"
+              }
+            }
+          },
+          {
+            "id": "trend-vascular-age",
+            "type": "trend",
+            "title": "Cardiovascular age",
+            "width": "col-span-12",
+            "height": "h-40",
+            "config": {
+              "dataKey": "cardiovascular_age.vascular_age",
+              "color": "#f472b6",
+              "dataKeys": [
+                "cardiovascular_age.vascular_age"
+              ],
+              "dateRange": {
+                "type": "relative",
+                "value": 90,
+                "unit": "days",
+                "anchor": "selected_date"
+              }
+            }
+          }
+        ],
+        "layout": [
+          {
+            "i": "trend-sleep-score",
+            "x": 0,
+            "y": 0,
+            "w": 12,
+            "h": 6
+          },
+          {
+            "i": "trend-readiness-score",
+            "x": 0,
+            "y": 6,
+            "w": 12,
+            "h": 6
+          },
+          {
+            "i": "trend-activity-score",
+            "x": 0,
+            "y": 12,
+            "w": 12,
+            "h": 6
+          },
+          {
+            "i": "trend-sleep-stages",
+            "x": 0,
+            "y": 18,
+            "w": 12,
+            "h": 6
+          },
+          {
+            "i": "trend-sleep-timing",
+            "x": 0,
+            "y": 24,
+            "w": 12,
+            "h": 6
+          },
+          {
+            "i": "trend-heart-rates",
+            "x": 0,
+            "y": 30,
+            "w": 12,
+            "h": 6
+          },
+          {
+            "i": "trend-hrv",
+            "x": 0,
+            "y": 36,
+            "w": 12,
+            "h": 6
+          },
+          {
+            "i": "trend-breath",
+            "x": 0,
+            "y": 42,
+            "w": 12,
+            "h": 6
+          },
+          {
+            "i": "bar-steps",
+            "x": 0,
+            "y": 48,
+            "w": 12,
+            "h": 6
+          },
+          {
+            "i": "trend-calories",
+            "x": 0,
+            "y": 54,
+            "w": 12,
+            "h": 6
+          },
+          {
+            "i": "trend-walking-distance",
+            "x": 0,
+            "y": 60,
+            "w": 12,
+            "h": 6
+          },
+          {
+            "i": "trend-activity-time",
+            "x": 0,
+            "y": 66,
+            "w": 12,
+            "h": 6
+          },
+          {
+            "i": "trend-met",
+            "x": 0,
+            "y": 72,
+            "w": 12,
+            "h": 6
+          },
+          {
+            "i": "trend-temp-dev",
+            "x": 0,
+            "y": 78,
+            "w": 12,
+            "h": 6
+          },
+          {
+            "i": "trend-spo2",
+            "x": 0,
+            "y": 84,
+            "w": 12,
+            "h": 6
+          },
+          {
+            "i": "trend-resilience",
+            "x": 0,
+            "y": 90,
+            "w": 12,
+            "h": 6
+          },
+          {
+            "i": "trend-vascular-age",
+            "x": 0,
+            "y": 96,
+            "w": 12,
+            "h": 6
+          }
+        ]
+      }
+    ],
+    "activeDashboardId": "default"
+  }
 }

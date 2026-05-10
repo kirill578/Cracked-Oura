@@ -402,7 +402,20 @@ async def process_ingestion(zip_path):
         # Success! Persist last_run as UTC ISO; the UI converts to browser tz.
         now_iso = datetime.now(timezone.utc).isoformat()
         config_manager.update_status("Idle", last_run=now_iso)
-        
+
+        # Send Telegram notification (best-effort; failures are logged, not raised).
+        try:
+            from backend.src.notifications import send_telegram_summary
+            cfg = config_manager.get_config()
+            bot_token = cfg.get("telegram_bot_token", "")
+            chat_id = cfg.get("telegram_chat_id", "")
+            if bot_token and chat_id:
+                result = await send_telegram_summary(bot_token, chat_id, db)
+                if not result.get("ok"):
+                    logger.warning(f"Telegram notification skipped: {result.get('error')}")
+        except Exception as notify_err:
+            logger.error(f"Telegram notification error: {notify_err}")
+
     except Exception as e:
         logger.error(f"Background worker: Ingestion failed: {e}")
         config_manager.update_status(f"Ingestion Failed: {str(e)}")

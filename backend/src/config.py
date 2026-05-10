@@ -46,7 +46,9 @@ class ConfigManager:
                 "is_active": True,
                 "headless": True,
                 "llm_model": "llama3.1:latest",
-                "llm_host": "http://localhost:11434"
+                "llm_host": "http://localhost:11434",
+                "telegram_bot_token": "",
+                "telegram_chat_id": ""
             }
             self._save_file(self.config_path, default_config)
 

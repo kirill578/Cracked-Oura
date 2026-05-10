@@ -21,12 +21,15 @@ export interface SettingsResponse {
     daily_sync_time: string;
     email: string;
     schedule_cadence: ScheduleCadence;
-    schedule_time_local: string;     // HH:MM in schedule_timezone
-    schedule_timezone: string;       // IANA, e.g. "America/Chicago"
-    schedule_day_of_week: number;    // 0=Mon..6=Sun
+    schedule_time_local: string;        // HH:MM in schedule_timezone
+    schedule_timezone: string;          // IANA, e.g. "America/Chicago"
+    schedule_day_of_week: number;       // 0=Mon..6=Sun
     schedule_jitter_minutes: number;
     next_run_utc: string | null;
     last_run_utc: string | null;
+    telegram_bot_token_set: boolean;
+    telegram_bot_token_masked: string;  // first 10 chars + "…", or "" if not set
+    telegram_chat_id: string;
 }
 
 export interface SettingsUpdate {
@@ -37,6 +40,8 @@ export interface SettingsUpdate {
     schedule_day_of_week?: number;
     schedule_jitter_minutes?: number;
     daily_sync_time?: string;
+    telegram_bot_token?: string;
+    telegram_chat_id?: string;
 }
 
 export const api = {
@@ -159,6 +164,14 @@ export const api = {
         });
         if (!res.ok) throw new Error('Failed to save layout');
         return res.json();
+    },
+
+    // --- Notifications ---
+    testTelegramNotification: async () => {
+        const res = await fetch(`${BASE_URL}/api/notifications/test`, { method: 'POST' });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.detail || 'Failed to send notification');
+        return data;
     },
 
     // --- Chat ---

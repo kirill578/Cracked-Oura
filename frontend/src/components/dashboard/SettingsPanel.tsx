@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { X, Loader2, AlertCircle, Download, Copy, Upload } from "lucide-react";
+import { X, Loader2, AlertCircle, Download, Copy, Upload, Send } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { cn } from "@/lib/utils";
 import { api, type AutomationStatusResponse, type ScheduleCadence } from '@/lib/api';
@@ -47,7 +47,7 @@ export function SettingsPanel({ onClose }: SettingsPanelProps) {
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [logs, setLogs] = useState<string[]>([]);
-    const [activeTab, setActiveTab] = useState<'automation' | 'layout'>('automation');
+    const [activeTab, setActiveTab] = useState<'automation' | 'notifications' | 'layout'>('automation');
 
     // Schedule state. `scheduleTimeLocal` is wall-clock in `scheduleTimezone`, so
     // "08:00 America/Chicago" stays at 8 AM local through DST. The browser tz is
@@ -59,6 +59,13 @@ export function SettingsPanel({ onClose }: SettingsPanelProps) {
     const [jitterMinutes, setJitterMinutes] = useState(20);
     const [nextRunUtc, setNextRunUtc] = useState<string | null>(null);
     const [lastRunUtc, setLastRunUtc] = useState<string | null>(null);
+
+    // Telegram notification settings
+    const [telegramToken, setTelegramToken] = useState('');
+    const [telegramTokenSet, setTelegramTokenSet] = useState(false);
+    const [telegramTokenMasked, setTelegramTokenMasked] = useState('');
+    const [telegramChatId, setTelegramChatId] = useState('');
+    const [telegramTesting, setTelegramTesting] = useState(false);
 
     useEffect(() => {
         api.getSettings()
@@ -78,6 +85,9 @@ export function SettingsPanel({ onClose }: SettingsPanelProps) {
                 if (typeof data.schedule_jitter_minutes === 'number') setJitterMinutes(data.schedule_jitter_minutes);
                 setNextRunUtc(data.next_run_utc ?? null);
                 setLastRunUtc(data.last_run_utc ?? null);
+                setTelegramTokenSet(data.telegram_bot_token_set ?? false);
+                setTelegramTokenMasked(data.telegram_bot_token_masked ?? '');
+                setTelegramChatId(data.telegram_chat_id ?? '');
             })
             .catch(err => console.error("Failed to fetch settings", err));
     }, []);
@@ -91,6 +101,41 @@ export function SettingsPanel({ onClose }: SettingsPanelProps) {
             setLastRunUtc(data.last_run_utc ?? null);
         } catch (e) {
             // Non-fatal — display stale.
+        }
+    };
+
+    const handleSaveTelegram = async () => {
+        setLoading(true);
+        setError(null);
+        try {
+            const payload: Record<string, string> = { telegram_chat_id: telegramChatId };
+            // Only send the token if the user actually typed something new
+            if (telegramToken) payload.telegram_bot_token = telegramToken;
+            await api.saveSettings(payload);
+            addLog('Telegram settings saved.');
+            // Refresh masked token display
+            const updated = await api.getSettings();
+            setTelegramTokenSet(updated.telegram_bot_token_set);
+            setTelegramTokenMasked(updated.telegram_bot_token_masked);
+            setTelegramToken(''); // clear plaintext field after save
+        } catch (err: any) {
+            setError(err.message);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleTestTelegram = async () => {
+        setTelegramTesting(true);
+        setError(null);
+        try {
+            const result = await api.testTelegramNotification();
+            addLog(`Telegram test: ${result.message}`);
+        } catch (err: any) {
+            setError(err.message);
+            addLog(`Telegram test failed: ${err.message}`);
+        } finally {
+            setTelegramTesting(false);
         }
     };
 
@@ -260,28 +305,20 @@ export function SettingsPanel({ onClose }: SettingsPanelProps) {
 
             {/* Tabs */}
             <div className="flex border-b">
-                <button
-                    className={cn(
-                        "flex-1 py-3 text-sm font-medium border-b-2 transition-colors",
-                        activeTab === 'automation'
-                            ? "border-primary text-primary"
-                            : "border-transparent text-muted-foreground hover:text-foreground"
-                    )}
-                    onClick={() => setActiveTab('automation')}
-                >
-                    Automation
-                </button>
-                <button
-                    className={cn(
-                        "flex-1 py-3 text-sm font-medium border-b-2 transition-colors",
-                        activeTab === 'layout'
-                            ? "border-primary text-primary"
-                            : "border-transparent text-muted-foreground hover:text-foreground"
-                    )}
-                    onClick={() => setActiveTab('layout')}
-                >
-                    Layout
-                </button>
+                {(["automation", "notifications", "layout"] as const).map(tab => (
+                    <button
+                        key={tab}
+                        className={cn(
+                            "flex-1 py-3 text-xs font-medium border-b-2 transition-colors capitalize",
+                            activeTab === tab
+                                ? "border-primary text-primary"
+                                : "border-transparent text-muted-foreground hover:text-foreground"
+                        )}
+                        onClick={() => setActiveTab(tab)}
+                    >
+                        {tab === 'automation' ? 'Automation' : tab === 'notifications' ? 'Notify' : 'Layout'}
+                    </button>
+                ))}
             </div>
 
             <div className="flex-1 p-6 space-y-6 overflow-y-auto">
@@ -542,6 +579,128 @@ export function SettingsPanel({ onClose }: SettingsPanelProps) {
                             </Button>
                         </div>
                     </>
+                )}
+
+                {activeTab === 'notifications' && (
+                    <div className="space-y-6">
+                        <div className="space-y-1">
+                            <h3 className="font-medium text-sm text-muted-foreground uppercase tracking-wider">Telegram</h3>
+                            <p className="text-[11px] text-muted-foreground">
+                                After each successful sync a message is sent to your Telegram chat:
+                            </p>
+                            <div className="rounded-md bg-secondary/40 p-3 font-mono text-[10px] text-foreground/80 leading-relaxed whitespace-pre">
+{`📊 Oura Daily Summary — Mon Jan 19
+
+Scores
+🟡 Sleep       54
+🟢 Readiness   74
+🔴 Activity    33
+
+👟 Yesterday's steps: 8,432
+
+😴 Sleep: 6h 12m
+  🔵 Deep   1h 12m
+  🟣 REM    0h 42m
+  ⚪ Light   4h 18m`}
+                            </div>
+                        </div>
+
+                        <div className="space-y-4">
+                            <div className="space-y-2">
+                                <Label>Bot Token</Label>
+                                {telegramTokenSet && !telegramToken && (
+                                    <p className="text-[11px] text-muted-foreground">
+                                        Currently saved: <span className="font-mono">{telegramTokenMasked}</span>
+                                    </p>
+                                )}
+                                <Input
+                                    type="password"
+                                    placeholder={telegramTokenSet ? "Enter new token to replace…" : "123456789:ABC-…"}
+                                    value={telegramToken}
+                                    onChange={e => setTelegramToken(e.target.value)}
+                                    autoComplete="off"
+                                />
+                                <p className="text-[11px] text-muted-foreground">
+                                    Create a bot via{' '}
+                                    <a
+                                        href="https://t.me/BotFather"
+                                        target="_blank"
+                                        rel="noreferrer"
+                                        className="underline"
+                                    >
+                                        @BotFather
+                                    </a>{' '}
+                                    and paste the token here.
+                                </p>
+                            </div>
+
+                            <div className="space-y-2">
+                                <Label>Chat ID</Label>
+                                <Input
+                                    placeholder="e.g. 123456789 or -100…"
+                                    value={telegramChatId}
+                                    onChange={e => setTelegramChatId(e.target.value)}
+                                />
+                                <p className="text-[11px] text-muted-foreground">
+                                    Forward a message from your bot to{' '}
+                                    <a
+                                        href="https://t.me/userinfobot"
+                                        target="_blank"
+                                        rel="noreferrer"
+                                        className="underline"
+                                    >
+                                        @userinfobot
+                                    </a>{' '}
+                                    to find your numeric ID.
+                                </p>
+                            </div>
+
+                            <Button
+                                onClick={handleSaveTelegram}
+                                disabled={loading || (!telegramToken && !telegramChatId)}
+                                className="w-full"
+                            >
+                                {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                                Save
+                            </Button>
+
+                            <div className="pt-1 border-t space-y-2">
+                                <Button
+                                    variant="outline"
+                                    onClick={handleTestTelegram}
+                                    disabled={telegramTesting || !telegramTokenSet}
+                                    className="w-full"
+                                >
+                                    {telegramTesting
+                                        ? <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                        : <Send className="mr-2 h-4 w-4" />}
+                                    Send now
+                                </Button>
+                                <p className="text-[11px] text-muted-foreground text-center">
+                                    {telegramTokenSet
+                                        ? "Sends the summary using current data. Automatic messages are only sent after a scheduled sync completes."
+                                        : "Save a bot token and chat ID first to enable notifications."}
+                                </p>
+                            </div>
+                        </div>
+
+                        {error && (
+                            <Alert variant="destructive">
+                                <AlertCircle className="h-4 w-4" />
+                                <AlertTitle>Error</AlertTitle>
+                                <AlertDescription>{error}</AlertDescription>
+                            </Alert>
+                        )}
+
+                        {/* Shared activity log */}
+                        <div className="space-y-2">
+                            <Label>Activity Log</Label>
+                            <div className="bg-black/50 rounded-md p-3 h-24 overflow-y-auto font-mono text-xs text-muted-foreground space-y-1">
+                                {logs.length === 0 && <span className="opacity-50">No activity yet…</span>}
+                                {logs.map((log, i) => <div key={i}>{log}</div>)}
+                            </div>
+                        </div>
+                    </div>
                 )}
 
                 {activeTab === 'layout' && (

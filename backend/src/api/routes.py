@@ -59,6 +59,8 @@ class SettingsRequest(BaseModel):
     schedule_timezone: Optional[str] = None         # IANA tz, e.g. "America/Chicago"
     schedule_day_of_week: Optional[int] = None      # 0=Mon ... 6=Sun
     schedule_jitter_minutes: Optional[int] = None
+    telegram_bot_token: Optional[str] = None
+    telegram_chat_id: Optional[str] = None
 
 class Dashboard(BaseModel):
     id: str
@@ -286,6 +288,12 @@ async def save_settings(request: SettingsRequest):
                 raise HTTPException(status_code=400, detail="schedule_jitter_minutes must be 0..240")
             updates["schedule_jitter_minutes"] = jitter
 
+        if request.telegram_bot_token is not None:
+            updates["telegram_bot_token"] = request.telegram_bot_token.strip()
+
+        if request.telegram_chat_id is not None:
+            updates["telegram_chat_id"] = request.telegram_chat_id.strip()
+
         # Any schedule change invalidates the cached next-run so the worker
         # recomputes (and re-rolls jitter) on the next tick.
         schedule_keys = {"schedule_cadence", "schedule_time_local", "schedule_timezone",
@@ -313,6 +321,10 @@ async def get_settings():
     try:
         config = config_manager.get_config()
         time_local = config.get("schedule_time_local") or config.get("schedule_time", "08:00")
+        raw_token: str = config.get("telegram_bot_token", "")
+        # Mask the token for display: show first 10 chars + "..." if set,
+        # so the UI confirms it's saved without exposing the full secret.
+        masked_token = (raw_token[:10] + "…" if len(raw_token) > 10 else raw_token)
         return {
             # Legacy alias retained so the existing UI keeps working during rollout
             "daily_sync_time": time_local,
@@ -324,9 +336,28 @@ async def get_settings():
             "schedule_jitter_minutes": int(config.get("schedule_jitter_minutes", 20)),
             "next_run_utc": config.get("next_run"),
             "last_run_utc": config.get("last_run"),
+            "telegram_bot_token_set": bool(raw_token),
+            "telegram_bot_token_masked": masked_token,
+            "telegram_chat_id": config.get("telegram_chat_id", ""),
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+# -----------------------------------------------------------------------------
+# Notification Endpoints
+# -----------------------------------------------------------------------------
+
+@router.post("/api/notifications/test")
+async def test_notification(db: Session = Depends(get_db)):
+    """Sends a test Telegram notification using the currently saved credentials."""
+    from ..notifications import send_telegram_summary
+    cfg = config_manager.get_config()
+    bot_token = cfg.get("telegram_bot_token", "")
+    chat_id = cfg.get("telegram_chat_id", "")
+    result = await send_telegram_summary(bot_token, chat_id, db)
+    if not result.get("ok"):
+        raise HTTPException(status_code=400, detail=result.get("error", "Failed to send"))
+    return {"message": "Notification sent successfully"}
 
 # -----------------------------------------------------------------------------
 # Dashboard Configuration Endpoints
