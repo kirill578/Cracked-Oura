@@ -1,6 +1,7 @@
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { format, parseISO } from "date-fns";
 import { cn } from "@/lib/utils";
+import { formatFieldValue, getFieldLabel, getFieldMeta } from "@/lib/fieldLabels";
 
 interface TableWidgetProps {
     data: any[];
@@ -45,70 +46,27 @@ export function TableWidget({ data, dataKeys, selectedDate }: TableWidgetProps) 
         return path.split('.').reduce((acc, part) => acc && acc[part], obj);
     };
 
-    // Helper to format key to Title Case
+    // Friendly label & value formatting come from the shared registry so the
+    // whole UI stays consistent.
     const formatKey = (key: string) => {
-        // Get last part if dot notation
-        const str = key.split('.').pop() || key;
-        // Replace underscores with spaces
-        const withSpaces = str.replace(/_/g, ' ');
-        // Capitalize words
-        return withSpaces.replace(/\b\w/g, l => l.toUpperCase());
+        const meta = getFieldMeta(key);
+        return meta.short ?? meta.label ?? getFieldLabel(key);
     };
 
-    // Helper to format duration (seconds -> "7h 55m" or "45m")
-    const formatDuration = (seconds: number) => {
-        if (!seconds) return '-';
-        const h = Math.floor(seconds / 3600);
-        const m = Math.floor((seconds % 3600) / 60);
-        if (h > 0) return `${h}h ${m}m`;
-        return `${m}m`;
-    };
-
-    // Helper to format time (ISO -> HH:mm)
-    const formatTime = (isoString: string) => {
-        if (!isoString) return '-';
-        try {
-            return format(parseISO(isoString), 'HH:mm');
-        } catch {
-            return isoString;
-        }
-    };
-
-    // Helper to format value based on key context
     const formatValue = (val: any, key: string) => {
-        const k = key.toLowerCase();
-
         if (val === null || val === undefined) return '-';
-
-        // 1. Time / Dates
-        if (typeof val === 'string' && (k.includes('start') || k.includes('end') || k.includes('timestamp') || k.includes('bedtime') || k.includes('wakeup'))) {
-            // If it looks like a full ISO string, extract time
-            if (val.includes('T')) return formatTime(val);
-            return val;
+        // The registry handles dates as `datetime` already, but legacy data may
+        // include raw ISO strings (e.g. 'sleep_session.bedtime_start'). Trim
+        // them to local time when no formatter applies.
+        const meta = getFieldMeta(key);
+        if (typeof val === 'string' && val.includes('T') && !meta.format) {
+            try {
+                return format(parseISO(val), 'HH:mm');
+            } catch {
+                return val;
+            }
         }
-
-        // 2. Durations (Oura usually sends seconds)
-        // Common keys: total_sleep_duration, deep_sleep_duration, latency, time_in_bed, awake_time, restless_periods
-        if (typeof val === 'number' && (k.includes('duration') || k.includes('latency') || k.includes('time_in_bed') || k.includes('awake') || k.includes('restless') || k === 'total')) {
-            return formatDuration(val);
-        }
-
-        // 3. Scores / Percentages (Round to int)
-        if (typeof val === 'number' && (k.includes('score') || k.includes('efficiency') || k.includes('percent') || k.includes('activity_daily_target'))) {
-            return Math.round(val).toString();
-        }
-
-        // 4. Specific Metrics
-        if (typeof val === 'number') {
-            if (k.includes('heart_rate') || k.includes('hrv') || k.includes('breath')) return Math.round(val).toString();
-            if (k.includes('temperature')) return val.toFixed(2);
-
-            // Generic decimals
-            if (Number.isInteger(val)) return val.toLocaleString();
-            return val.toLocaleString(undefined, { maximumFractionDigits: 2 });
-        }
-
-        return val.toString();
+        return formatFieldValue(key, val);
     };
 
     return (

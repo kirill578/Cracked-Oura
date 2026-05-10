@@ -3,6 +3,7 @@ import { api } from "@/lib/api";
 import { Checkbox } from "@/components/ui/checkbox";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
+import { getDomainLabel, getLeafFieldLabel } from "@/lib/fieldLabels";
 import {
     ChevronRight,
     ChevronDown,
@@ -120,7 +121,11 @@ function FieldNode({ name, node, pathPrefix, onSelect, selectedPath, selectedPat
                         />
                     )}
                     {level === 0 && <Icon className="h-4 w-4 text-primary shrink-0" />}
-                    <span className={cn("truncate", level === 0 && "capitalize")}>{name.replace('_', ' ')}</span>
+                    <span className="truncate">
+                        {level === 0
+                            ? getDomainLabel(name)
+                            : name.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())}
+                    </span>
                 </button>
             </div>
 
@@ -154,7 +159,7 @@ function FieldNode({ name, node, pathPrefix, onSelect, selectedPath, selectedPat
                                         className="mr-2 h-3.5 w-3.5"
                                     />
                                 )}
-                                {field}
+                                {getLeafFieldLabel(pathPrefix || name, field)}
                             </button>
                         );
                     })}

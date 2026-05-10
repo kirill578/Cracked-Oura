@@ -5,6 +5,7 @@ import { BarChartCanvas } from './widgets/BarChartCanvas';
 import { RadarChartCanvas } from './widgets/RadarChartCanvas';
 import { JSONWidget } from './widgets/JSONWidget';
 import type { WidgetInstance } from '@/types';
+import { formatFieldValue, getFieldLabel, getFieldMeta } from '@/lib/fieldLabels';
 
 interface WidgetRegistryProps {
     widget: WidgetInstance;
@@ -13,26 +14,51 @@ interface WidgetRegistryProps {
     onUpdate?: (updates: Partial<WidgetInstance>) => void;
 }
 
+// Top-level domains that the daily endpoint exposes as a plural list rather
+// than a singular object. We auto-resolve `sleep_session.foo` to
+// `sleep_sessions[0].foo` so the same dot-notation works in metric widgets.
+const PLURALIZED_DOMAINS: Record<string, string> = {
+    sleep_session: 'sleep_sessions',
+    workout: 'workouts',
+};
+
 export const WidgetRegistry = ({ widget, data, date, onUpdate }: WidgetRegistryProps) => {
-    // Helper to resolve dot notation
+    // Helper to resolve dot notation, with fallbacks for list-shaped domains.
     const resolveData = (path: string) => {
         if (!path || path === 'root') return data;
-        const keys = path?.split('.') || [];
-        let value = data;
-        for (const key of keys) {
-            value = value?.[key];
+        const parts = path?.split('.') || [];
+        if (parts.length === 0) return undefined;
+
+        const root = parts[0];
+        let candidates: any[] = [data?.[root]];
+
+        // Fallback to plural list form on the daily payload.
+        const pluralKey = PLURALIZED_DOMAINS[root];
+        if (pluralKey && data?.[pluralKey]) {
+            const list = data[pluralKey];
+            if (Array.isArray(list) && list.length > 0) {
+                candidates.push(list[0]);
+            }
         }
-        return value;
+
+        for (const candidate of candidates) {
+            if (candidate === undefined || candidate === null) continue;
+            let value: any = candidate;
+            for (let i = 1; i < parts.length; i++) {
+                value = value?.[parts[i]];
+            }
+            if (value !== undefined && value !== null) return value;
+        }
+        return undefined;
     };
 
     switch (widget.type) {
         case 'score':
             const score = resolveData(widget.config.dataKey || '') || 0;
-            const scoreLabel = widget.config.dataKey || 'Score';
             return (
                 <ScoreGaugeCanvas
                     score={typeof score === 'number' ? score : 0}
-                    title={scoreLabel}
+                    title={getFieldMeta(widget.config.dataKey).short ?? getFieldLabel(widget.config.dataKey)}
                     color={widget.config.color}
                 />
             );
@@ -44,29 +70,21 @@ export const WidgetRegistry = ({ widget, data, date, onUpdate }: WidgetRegistryP
                     onUpdate={onUpdate}
                 />
             );
-        case 'metric':
-            const metricValue = resolveData(widget.config.dataKey || '') || 0;
-            const metricLabel = widget.config.dataKey || 'Metric';
-
-            // Special formatting for duration (if dataKey contains 'total' or 'duration')
-            let displayValue = metricValue;
-            let unit = widget.config.unit;
-
-            if (widget.config.dataKey?.includes('sleep.total') || widget.config.dataKey?.includes('duration')) {
-                const hours = Math.floor(metricValue / 60);
-                const mins = metricValue % 60;
-                displayValue = `${hours}h ${mins}m`;
-                unit = ""; // Unit is built-in
-            }
-
+        case 'metric': {
+            const rawValue = resolveData(widget.config.dataKey || '');
+            const meta = getFieldMeta(widget.config.dataKey);
+            const formatted = formatFieldValue(widget.config.dataKey, rawValue);
+            // If the formatter already includes a unit (e.g. "8,300 steps") drop the explicit unit prop.
+            const formattedHasUnit = typeof formatted === 'string' && /[a-zA-Z%°]/.test(formatted);
             return (
                 <MetricWidget
-                    value={displayValue}
-                    label={metricLabel}
-                    unit={unit}
+                    value={formatted}
+                    label={meta.label}
+                    unit={formattedHasUnit ? '' : (widget.config.unit ?? meta.unit ?? '')}
                     color={widget.config.color}
                 />
             );
+        }
         case 'bar':
             let barData = resolveData(widget.config.dataKey || '') || [];
 

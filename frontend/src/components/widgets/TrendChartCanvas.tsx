@@ -13,6 +13,7 @@ import {
 } from 'chart.js';
 import { Line } from 'react-chartjs-2';
 import { useTheme } from '@/components/theme-provider';
+import { formatFieldValue, getFieldMeta, getCategoricalDomain, getCategoricalLabel } from '@/lib/fieldLabels';
 
 // Register ChartJS components
 ChartJS.register(
@@ -42,6 +43,16 @@ export function TrendChartCanvas({ data, dataKey, dataKeys, title, color, showPo
     // Determine keys to plot
     const keys = (dataKeys && dataKeys.length > 0) ? dataKeys : (dataKey ? [dataKey] : []);
 
+    // Categorical domain (e.g. sleep phases). When set, the y-axis uses
+    // discrete labels instead of raw numbers.
+    const categoricalDomain = keys.length > 0 ? getCategoricalDomain(keys[0]) : null;
+    const categoricalKey = categoricalDomain ? keys[0] : null;
+    const categoricalEntries = categoricalDomain
+        ? Object.entries(categoricalDomain).map(([k, v]) => ({ value: Number(k), label: v }))
+        : [];
+    const categoricalMin = categoricalEntries.length ? Math.min(...categoricalEntries.map(e => e.value)) : undefined;
+    const categoricalMax = categoricalEntries.length ? Math.max(...categoricalEntries.map(e => e.value)) : undefined;
+
     // Color palette for multi-series
     const colors = [
         color,
@@ -62,10 +73,12 @@ export function TrendChartCanvas({ data, dataKey, dataKeys, title, color, showPo
 
 
             const seriesColor = colors[index % colors.length];
-            const label = key.split('.').pop()?.replace(/_/g, ' ') || title;
+            const meta = getFieldMeta(key);
+            const label = meta.short ?? meta.label ?? title;
 
             return {
                 label: label,
+                __dataKey: key,
                 data: data.map(d => d[key] !== undefined ? d[key] : d.value),
                 borderColor: seriesColor,
                 backgroundColor: (context: ScriptableContext<'line'>) => {
@@ -75,8 +88,9 @@ export function TrendChartCanvas({ data, dataKey, dataKeys, title, color, showPo
                     gradient.addColorStop(1, `${seriesColor}00`); // 0% opacity
                     return gradient;
                 },
-                fill: true,
+                fill: !categoricalDomain,
                 tension: 0, // No smoothing (linear)
+                stepped: categoricalDomain ? ('after' as const) : false,
                 pointRadius: showPoints ? 3 : 0, // Show points if enabled
                 pointHoverRadius: 4,
                 borderWidth: 2,
@@ -129,14 +143,13 @@ export function TrendChartCanvas({ data, dataKey, dataKeys, title, color, showPo
                         return `${day}.${month}.${y}`;
                     },
                     label: (context) => {
-                        let label = context.dataset.label || '';
-                        if (label) {
-                            label += ': ';
-                        }
-                        if (context.parsed.y !== null) {
-                            label += context.parsed.y;
-                        }
-                        return label;
+                        const baseLabel = context.dataset.label || '';
+                        if (context.parsed.y === null) return baseLabel;
+                        const ds: any = context.dataset;
+                        const valueStr = ds.__dataKey
+                            ? formatFieldValue(ds.__dataKey, context.parsed.y)
+                            : String(context.parsed.y);
+                        return baseLabel ? `${baseLabel}: ${valueStr}` : valueStr;
                     }
                 }
             }
@@ -200,8 +213,23 @@ export function TrendChartCanvas({ data, dataKey, dataKeys, title, color, showPo
                     color: isDark ? '#9ca3af' : '#6b7280',
                     font: {
                         size: 10
+                    },
+                    ...(categoricalDomain
+                        ? {
+                            stepSize: 1,
+                            callback: function (val: any) {
+                                const num = typeof val === 'number' ? val : Number(val);
+                                return getCategoricalLabel(categoricalKey, num) ?? '';
+                            },
+                        }
+                        : {}),
+                },
+                ...(categoricalDomain
+                    ? {
+                        min: typeof categoricalMin === 'number' ? categoricalMin - 0.5 : undefined,
+                        max: typeof categoricalMax === 'number' ? categoricalMax + 0.5 : undefined,
                     }
-                }
+                    : {}),
             }
         }
     };

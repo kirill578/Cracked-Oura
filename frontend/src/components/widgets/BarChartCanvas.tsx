@@ -10,6 +10,7 @@ import {
 } from 'chart.js';
 import { Bar } from 'react-chartjs-2';
 import { useTheme } from '@/components/theme-provider';
+import { formatFieldValue, getFieldMeta } from '@/lib/fieldLabels';
 
 // Register ChartJS components
 ChartJS.register(
@@ -32,11 +33,14 @@ export function BarChartCanvas({ data, dataKey, categoryKey = "name", color = "#
     const { theme } = useTheme();
     const isDark = theme === 'dark';
 
+    const meta = getFieldMeta(dataKey);
+    const seriesLabel = meta.short ?? meta.label ?? dataKey;
+
     const chartData = {
         labels: data.map(d => d[categoryKey]),
         datasets: [
             {
-                label: dataKey,
+                label: seriesLabel,
                 data: data.map(d => d[dataKey]),
                 backgroundColor: color,
                 borderRadius: 4, // Rounded corners like Recharts radius={[4, 4, 0, 0]}
@@ -62,6 +66,12 @@ export function BarChartCanvas({ data, dataKey, categoryKey = "name", color = "#
                 bodyColor: isDark ? '#f3f4f6' : '#111827',
                 borderColor: isDark ? '#374151' : '#e5e7eb',
                 borderWidth: 1,
+                callbacks: {
+                    label: (context) => {
+                        if (context.parsed.y === null || context.parsed.y === undefined) return seriesLabel;
+                        return `${seriesLabel}: ${formatFieldValue(dataKey, context.parsed.y)}`;
+                    }
+                }
             }
         },
         scales: {

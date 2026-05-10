@@ -38,7 +38,15 @@ logger.info(f"API Starting... Logging to {log_file}")
 async def lifespan(app: FastAPI):
     # Startup
     init_db()
-    
+
+    # First-run convenience: if the DB is empty and a bundled CSV folder
+    # exists at <repo>/data/App Data, ingest it automatically so the user
+    # gets a populated dashboard the first time they boot the app.
+    try:
+        autoload_bundled_data()
+    except Exception as e:
+        logger.error(f"Auto-load of bundled data failed: {e}")
+
     # Reset status on startup in case it was stuck
     cfg = config_manager.get_config()
     if cfg.get("status") not in ["Idle", "Error"]:
@@ -52,6 +60,76 @@ async def lifespan(app: FastAPI):
     
     # Shutdown (optional cleanup)
     # task.cancel()
+
+
+def autoload_bundled_data() -> None:
+    """
+    Auto-import a bundled Oura CSV folder on first boot.
+
+    Looks at:
+      1. $OURA_AUTO_SEED_DIR if set
+      2. <repo_root>/data/App Data (when running from source)
+
+    Skips when the DB already contains any Sleep records, or when no folder
+    is found.
+    """
+    from backend.src.models import Sleep
+
+    db = SessionLocal()
+    try:
+        if db.query(Sleep).first() is not None:
+            return  # Already populated
+    finally:
+        db.close()
+
+    candidates = []
+    env_dir = os.environ.get("OURA_AUTO_SEED_DIR")
+    if env_dir:
+        candidates.append(env_dir)
+
+    # backend/src/api/main.py -> repo root is three levels up
+    here = os.path.dirname(os.path.abspath(__file__))
+    repo_root = os.path.abspath(os.path.join(here, "..", "..", ".."))
+    candidates.append(os.path.join(repo_root, "data", "App Data"))
+
+    target = next((c for c in candidates if c and os.path.isdir(c)), None)
+    if not target:
+        return
+
+    logger.info(f"Empty database detected. Auto-ingesting CSVs from {target}")
+
+    # Seed the default dashboard layout if user has none yet, so the UI
+    # has widgets the moment data lands.
+    try:
+        from pathlib import Path
+        import shutil as _shutil
+        import json as _json
+
+        template = os.path.join(repo_root, "oura_dashboard.json")
+        dest = os.path.join(get_user_data_dir(), "oura_dashboard.json")
+        if os.path.exists(template):
+            should_copy = True
+            if os.path.exists(dest):
+                try:
+                    existing = _json.loads(Path(dest).read_text())
+                    dashboards = (existing.get("dashboard") or {}).get("dashboards") or []
+                    if dashboards:
+                        should_copy = False
+                except Exception:
+                    pass
+            if should_copy:
+                _shutil.copyfile(template, dest)
+                logger.info(f"Seeded default dashboard layout -> {dest}")
+    except Exception as e:
+        logger.warning(f"Could not seed default dashboard layout: {e}")
+
+    db = SessionLocal()
+    try:
+        parser = OuraParser(db)
+        parser.parse_directory(target)
+        logger.info("Auto-ingest complete.")
+    finally:
+        db.close()
 
 app = FastAPI(
     title="Cracked Oura API",
