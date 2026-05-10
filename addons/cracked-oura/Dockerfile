@@ -1,64 +1,44 @@
-ARG BUILD_FROM=ghcr.io/home-assistant/amd64-base-python:3.12-alpine3.20
+ARG BUILD_FROM=python:3.12-slim-bookworm
 
 # ── Stage 1: build the React frontend ────────────────────────────────────────
 FROM node:24-alpine AS frontend-builder
 
 WORKDIR /app/frontend
 
-# Install dependencies first for better layer caching
 COPY frontend/package*.json ./
 RUN npm ci --prefer-offline --legacy-peer-deps
 
 COPY frontend/ ./
 RUN npm run build:web
 
-# ── Stage 2: final image on the HA base ──────────────────────────────────────
+# ── Stage 2: final runtime image (Debian — required for playwright/glibc) ────
 FROM $BUILD_FROM
 
-# System packages:
-#  - bash + jq for bashio
-#  - chromium: system Chromium used by Playwright (pre-baked, no download at runtime)
-#  - gcc/musl-dev/libffi-dev/openssl-dev: compile Python native extensions (cryptography, etc.)
-RUN apk add --no-cache \
-    bash \
-    jq \
+# Chromium + runtime fonts + jq (for parsing /data/options.json in run.sh)
+RUN apt-get update && apt-get install -y --no-install-recommends \
     chromium \
-    nss \
-    freetype \
-    harfbuzz \
-    ca-certificates \
-    ttf-freefont \
-    font-noto-emoji \
-    gcc \
-    musl-dev \
-    libffi-dev \
-    openssl-dev
+    fonts-freefont-ttf \
+    fonts-noto-color-emoji \
+    jq \
+    && rm -rf /var/lib/apt/lists/*
 
-# Point automation.py at the Alpine system Chromium binary.
-# CHROMIUM_EXECUTABLE_PATH is our own env var read by automation.py.
-ENV CHROMIUM_EXECUTABLE_PATH=/usr/bin/chromium-browser
-# Prevent Playwright from trying to download its own browser bundle.
+# Point automation.py at the Debian system Chromium
+ENV CHROMIUM_EXECUTABLE_PATH=/usr/bin/chromium
+# Prevent Playwright from downloading its own browser bundle
 ENV PLAYWRIGHT_BROWSERS_PATH=0
 
 WORKDIR /app
 ENV PYTHONPATH=/app
 
-# Install Python dependencies (includes playwright, fastapi, uvicorn, etc.)
 COPY requirements.txt ./
 RUN pip install --no-cache-dir -r requirements.txt
 
-# playwright install-deps is Debian-only; on Alpine we rely on the system
-# packages installed above. Run it anyway in case it does something useful,
-# but don't fail the build if it errors.
+# Let playwright install any missing OS deps it knows about for Debian
 RUN playwright install-deps chromium 2>/dev/null || true
 
-# Application source
 COPY backend/ ./backend/
-
-# Built frontend from stage 1
 COPY --from=frontend-builder /app/frontend/dist ./frontend/dist
 
-# Add-on entrypoint (run.sh is S6-compatible; CMD is enough for single service)
 COPY run.sh /
 RUN chmod +x /run.sh
 

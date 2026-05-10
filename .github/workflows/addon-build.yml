@@ -27,10 +27,8 @@ jobs:
         include:
           - arch: amd64
             platform: linux/amd64
-            build_from: ghcr.io/home-assistant/amd64-base-python:3.12-alpine3.20
           - arch: aarch64
             platform: linux/arm64
-            build_from: ghcr.io/home-assistant/aarch64-base-python:3.12-alpine3.20
 
     steps:
       - name: Checkout
@@ -79,8 +77,6 @@ jobs:
           file: addons/cracked-oura/Dockerfile
           platforms: ${{ matrix.platform }}
           push: ${{ github.event_name != 'pull_request' }}
-          build-args: |
-            BUILD_FROM=${{ matrix.build_from }}
           tags: |
             ghcr.io/${{ github.repository_owner }}/${{ matrix.arch }}-addon-cracked-oura:${{ steps.version.outputs.version }}
             ghcr.io/${{ github.repository_owner }}/${{ matrix.arch }}-addon-cracked-oura:latest

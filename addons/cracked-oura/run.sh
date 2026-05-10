@@ -1,24 +1,22 @@
-#!/usr/bin/with-contenv bashio
+#!/usr/bin/env bash
+set -euo pipefail
+
+OPTIONS="${CONFIG_PATH:-/data/options.json}"
+
+# Helper: read a key from options.json with a fallback default
+_opt() { jq -r ".$1 // \"$2\"" "$OPTIONS"; }
 
 export HA_ADDON=1
-export PORT="$(bashio::config 'port')"
-export LOG_LEVEL="$(bashio::config 'log_level')"
-export LLM_HOST="$(bashio::config 'llm_host')"
-export LLM_MODEL="$(bashio::config 'llm_model')"
+export PORT="$(_opt port 8000)"
+export LOG_LEVEL="$(_opt log_level info)"
+export LLM_HOST="$(_opt llm_host 'http://localhost:11434')"
+export LLM_MODEL="$(_opt llm_model 'llama3.1:latest')"
+export TELEGRAM_BOT_TOKEN="$(_opt telegram_bot_token '')"
+export TELEGRAM_CHAT_ID="$(_opt telegram_chat_id '')"
 
-# Optional fields — only export when the user actually provided a value
-export TELEGRAM_BOT_TOKEN=""
-export TELEGRAM_CHAT_ID=""
-if bashio::config.has_value 'telegram_bot_token'; then
-    export TELEGRAM_BOT_TOKEN="$(bashio::config 'telegram_bot_token')"
-fi
-if bashio::config.has_value 'telegram_chat_id'; then
-    export TELEGRAM_CHAT_ID="$(bashio::config 'telegram_chat_id')"
-fi
-
-bashio::log.info "Starting Cracked Oura"
-bashio::log.info "Port:      ${PORT}"
-bashio::log.info "LLM host:  ${LLM_HOST}"
-bashio::log.info "LLM model: ${LLM_MODEL}"
+echo "Starting Cracked Oura"
+echo "Port:      ${PORT}"
+echo "LLM host:  ${LLM_HOST}"
+echo "LLM model: ${LLM_MODEL}"
 
 exec python -m backend.src.api.main
