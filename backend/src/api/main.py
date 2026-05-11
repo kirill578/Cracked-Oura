@@ -26,6 +26,11 @@ import os
 
 _ha_addon = os.environ.get("HA_ADDON") == "1"
 
+# Version baked into the image at build time (see addons/cracked-oura/
+# Dockerfile + .github/workflows/addon-build.yml). The UI surfaces this so
+# users can verify an add-on update actually landed end-to-end.
+APP_VERSION = os.environ.get("CRACKED_OURA_VERSION", "dev")
+
 if _ha_addon:
     logging.basicConfig(
         level=logging.INFO,
@@ -169,9 +174,21 @@ def autoload_bundled_data() -> None:
 app = FastAPI(
     title="Cracked Oura API",
     description="API for accessing Oura Ring data stored in local SQLite database.",
-    version="0.1.0",
+    version=APP_VERSION,
     lifespan=lifespan
 )
+
+
+@app.get("/api/version")
+async def get_version():
+    """Returns the running add-on version (baked at image build time).
+
+    The UI uses this to render "v0.1.x" in the sidebar so a user can
+    immediately tell whether their browser is talking to the new image
+    after an HA add-on update — without it, it's hard to distinguish
+    "fix didn't work" from "browser/ingress cached the old bundle".
+    """
+    return {"version": APP_VERSION}
 
 # Configure CORS
 origins = [
@@ -603,13 +620,50 @@ async def background_worker():
 from fastapi.staticfiles import StaticFiles
 import os
 
+
+class _CacheAwareStaticFiles(StaticFiles):
+    """Static-file server that emits Cache-Control headers tailored to a Vite
+    SPA so add-on updates actually reach the user.
+
+    Why this exists: the HA Ingress proxy and the user's browser both cache
+    aggressively by default. When the add-on is updated, the new container
+    serves a freshly-built ``index.html`` whose ``<script src>`` references
+    new content-hashed asset filenames (``assets/index-<hash>.js``) — but if
+    the browser keeps reusing the cached ``index.html`` from the previous
+    version, the user runs the *old* JS forever, even after a normal page
+    reload. That manifested as "I updated the add-on but nothing changed"
+    bug reports against this app's session-persistence and data-refresh
+    fixes.
+
+    Strategy:
+      * ``index.html`` and any ``*.html`` are sent with ``no-store`` so the
+        browser/proxy always re-asks the server for the current pointer.
+      * ``assets/*`` files are content-hashed by Vite, so their content can
+        never change for a given URL. Mark them ``immutable`` with a 1-year
+        max-age — fast for users, safe across deploys.
+    """
+
+    async def get_response(self, path: str, scope):
+        response = await super().get_response(path, scope)
+        # `path` is the relative asset path StaticFiles resolved (e.g.
+        # "index.html" or "assets/index-abc123.js"); empty string is the
+        # directory root, which html=True serves as index.html.
+        if path == "" or path.endswith(".html"):
+            response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
+            response.headers["Pragma"] = "no-cache"
+            response.headers["Expires"] = "0"
+        elif path.startswith("assets/"):
+            response.headers["Cache-Control"] = "public, max-age=31536000, immutable"
+        return response
+
+
 # Robustly find the frontend/dist directory relative to this file
 # engine/src/api/main.py -> ../../../frontend/dist
 current_dir = os.path.dirname(os.path.abspath(__file__))
 dist_dir = os.path.join(current_dir, "../../../frontend/dist")
 
 if os.path.exists(dist_dir):
-    app.mount("/", StaticFiles(directory=dist_dir, html=True), name="static")
+    app.mount("/", _CacheAwareStaticFiles(directory=dist_dir, html=True), name="static")
 else:
     pass
 

@@ -144,6 +144,16 @@ export const api = {
         return res.json();
     },
 
+    /** Returns the running add-on version (e.g. "0.1.2") baked at build
+     * time. Shown in the sidebar so users can confirm an HA add-on update
+     * really landed instead of being served stale by ingress/browser
+     * caches. */
+    getVersion: async (): Promise<{ version: string }> => {
+        const res = await fetch(`${BASE_URL}/api/version`);
+        if (!res.ok) throw new Error('Failed to fetch version');
+        return res.json();
+    },
+
     downloadExport: async () => {
         const res = await fetch(`${BASE_URL}/api/automation/download`, { method: 'POST' });
         const data = await res.json();

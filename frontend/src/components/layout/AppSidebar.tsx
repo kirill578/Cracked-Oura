@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Input } from "@/components/ui/input";
@@ -21,6 +21,7 @@ import {
     DropdownMenuTrigger,
 } from "../ui/dropdown-menu";
 import type { Dashboard } from "@/types";
+import { api } from "@/lib/api";
 
 interface AppSidebarProps {
     className?: string;
@@ -50,6 +51,17 @@ export function AppSidebar({
     const [collapsed, setCollapsed] = useState(false);
     const [editingId, setEditingId] = useState<string | null>(null);
     const [editName, setEditName] = useState("");
+    // Surfaced in the footer so a user can confirm an add-on update really
+    // landed (vs. their browser/ingress serving a stale bundle). Falls back
+    // to "—" if the new endpoint isn't deployed yet so the sidebar still
+    // renders against an older backend.
+    const [version, setVersion] = useState<string>("—");
+
+    useEffect(() => {
+        api.getVersion()
+            .then(({ version }) => setVersion(version))
+            .catch(() => setVersion("—"));
+    }, []);
 
     const handleStartEdit = (dashboard: Dashboard) => {
         setEditingId(dashboard.id);
@@ -202,6 +214,15 @@ export function AppSidebar({
                 >
                     <Settings className="h-5 w-5" />
                 </Button>
+                <div
+                    className={cn(
+                        "text-[10px] font-mono text-muted-foreground/70 text-center pt-1 select-none",
+                        collapsed && "tracking-tight"
+                    )}
+                    title={`Cracked Oura version ${version}`}
+                >
+                    v{version}
+                </div>
             </div>
         </div>
     );

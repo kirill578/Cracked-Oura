@@ -77,6 +77,12 @@ jobs:
           file: addons/cracked-oura/Dockerfile
           platforms: ${{ matrix.platform }}
           push: ${{ github.event_name != 'pull_request' }}
+          # Pass the version into the image so the running container can
+          # report it back via /api/version. The UI shows this so users can
+          # confirm an add-on update actually landed (and didn't get stuck
+          # behind HA Ingress / browser caches).
+          build-args: |
+            VERSION=${{ steps.version.outputs.version }}
           tags: |
             ghcr.io/${{ github.repository_owner }}/${{ matrix.arch }}-addon-cracked-oura:${{ steps.version.outputs.version }}
             ghcr.io/${{ github.repository_owner }}/${{ matrix.arch }}-addon-cracked-oura:latest

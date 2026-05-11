@@ -14,6 +14,12 @@ RUN npm run build:web
 # ── Stage 2: final runtime image (Debian — required for playwright/glibc) ────
 FROM $BUILD_FROM
 
+# Add-on version, plumbed through CI from addons/cracked-oura/config.yaml so
+# the running container can report it (used by /api/version + UI footer to
+# verify users actually got the new image after an update).
+ARG VERSION=dev
+ENV CRACKED_OURA_VERSION=$VERSION
+
 # Chromium + runtime fonts + jq (for parsing /data/options.json in run.sh)
 RUN apt-get update && apt-get install -y --no-install-recommends \
     chromium \
